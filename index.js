@@ -13,10 +13,20 @@ export default async function handler(req, res) {
     }
   } catch (err) {
     console.error('[Vercel Serverless] DB connection error:', err.message);
-    return res.status(500).json({
-      message: `Database connection error: ${err.message}. Please check MONGODB_URI in Vercel Environment Variables and ensure MongoDB Atlas allows 0.0.0.0/0 in Network Access.`,
-      error: err.message,
-    });
+    if (!res.headersSent) {
+      return res.status(500).json({
+        message: `Database connection error: ${err.message}. Please check MONGODB_URI in Vercel Environment Variables.`,
+        error: err.message,
+      });
+    }
+    return;
   }
-  return app(req, res);
+
+  return new Promise((resolve) => {
+    res.on('finish', resolve);
+    res.on('close', resolve);
+    app(req, res, () => {
+      resolve();
+    });
+  });
 }
