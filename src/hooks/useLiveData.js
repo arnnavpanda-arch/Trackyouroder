@@ -52,5 +52,41 @@ export default function useLiveData(fetcher, deps = []) {
       ev.forEach((e) => socket.off(e, load));
     };
   }, [socket, load]);
+
+  // Real-time synchronization fallback across devices (Laptop <-> Mobile)
+  useEffect(() => {
+    let isMounted = true;
+    const silentSync = () => {
+      fetcher()
+        .then((d) => {
+          if (isMounted && d != null) {
+            setData(d);
+            setError('');
+          }
+        })
+        .catch(() => {});
+    };
+
+    // Auto-poll every 3.5 seconds so laptop and mobile stay in sync in real time
+    const timer = setInterval(silentSync, 3500);
+
+    // Sync immediately when user switches tabs or unlocks phone screen
+    const onFocusOrVisible = () => {
+      if (document.visibilityState === 'visible') {
+        silentSync();
+      }
+    };
+
+    window.addEventListener('visibilitychange', onFocusOrVisible);
+    window.addEventListener('focus', onFocusOrVisible);
+
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+      window.removeEventListener('visibilitychange', onFocusOrVisible);
+      window.removeEventListener('focus', onFocusOrVisible);
+    };
+  }, [fetcher]);
+
   return { data, loading, error, reload: load };
 }

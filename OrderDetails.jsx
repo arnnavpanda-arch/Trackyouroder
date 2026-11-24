@@ -24,7 +24,7 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
   const location = useLocation();
   const nav = useNavigate();
   const id = propOrderId || paramId || location.state?.orderId || sessionStorage.getItem('dt_user_active_order');
-  const { user, socket, toast } = useApp();
+  const { user, socket, toast, settings } = useApp() || {};
   const { data: order, loading, error, reload } = useLiveData(
     () => (id ? api.getOrder(id) : Promise.reject(new Error('No order selected'))),
     [id]
