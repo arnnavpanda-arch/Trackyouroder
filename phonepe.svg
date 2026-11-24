@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 52" width="200" height="52">
+  <!-- PhonePe Rounded Purple Icon Badge -->
+  <rect x="2" y="2" width="48" height="48" rx="12" fill="#5f259f"/>
+  
+  <!-- White Devanagari Pe (पे) Symbol -->
+  <g fill="#ffffff">
+    <!-- Top Matra Curve -->
+    <path d="M32.5 13.8c-1.8-1.8-4.8-2.6-8.2-2.6h-9.8v4.5h9c2.5 0 4.5.6 5.8 1.9.8.8 1.8.8 2.6 0 .8-.8.8-2.6.6-3.8z"/>
+    <!-- Vertical Right Stem -->
+    <rect x="28.2" y="17" width="5.4" height="23.5" rx="1.5"/>
+    <!-- Left P-Loop -->
+    <path d="M19.5 17h9.5v5.2h-5.8c-2 0-3.5 1.5-3.5 3.5v.4c0 2 1.5 3.5 3.5 3.5h5.8v5.2h-6.2c-4.8 0-8.8-4-8.8-8.8v-.6c0-4.8 4-8.4 8.8-8.4z"/>
+    <!-- Diagonal Leg Stroke -->
+    <path d="M19.2 29.4l9.4 11.2h6.8l-10-11.8h-6.2z"/>
+  </g>
+
+  <!-- Official PhonePe Brand Typography -->
+  <text x="58" y="35" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="800" fill="#5f259f" letter-spacing="-0.4">
+    Phone<tspan fill="#282c3f">Pe</tspan>
+  </text>
+</svg>

@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trackora Freight Services</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --u: min(100vw / 1440, 100vh / 960);
+      --edge-px: 44.8vh;
+      --ph: 0;
+    }
+
+    @media (max-width: 767px), (orientation: portrait) {
+      :root {
+        --u: min(100vw / 430, 1.4px);
+      }
+    }
+
+    html, body {
+      background: #ffffff;
+      color: #111111;
+      font-family: 'Archivo', sans-serif;
+      overflow-x: hidden;
+      width: 100%;
+    }
+
+    /* Top Progress Scrubber */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: rgba(0, 0, 0, 0.08);
+      z-index: 100;
+      cursor: pointer;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2f63ff, #ff3344);
+      transition: width 0.08s linear;
+    }
+
+    /* Track */
+    .track {
+      position: relative;
+      background: #ffffff;
+      width: 100%;
+    }
+
+    /* Absolute Nav */
+    .nav {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: calc(34 * var(--u)) calc(50 * var(--u));
+      z-index: 50;
+      pointer-events: auto;
+    }
+
+    .nav-brand {
+      font-family: 'Archivo', sans-serif;
+      font-weight: 600;
+      font-size: calc(30 * var(--u));
+      letter-spacing: -0.06em;
+      color: #111111;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: calc(20 * var(--u));
+    }
+
+    .play-toggle {
+      font-family: 'Archivo', sans-serif;
+      font-weight: 600;
+      font-size: calc(10 * var(--u));
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: #111111;
+      color: #ffffff;
+      border: 0;
+      border-radius: 9999px;
+      padding: calc(6 * var(--u)) calc(16 * var(--u));
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+      transition: background 0.2s, transform 0.15s;
+    }
+
+    .play-toggle:hover {
+      background: #2f63ff;
+      transform: translateY(-1px);
+    }
+
+    .nav-link {
+      font-family: 'Archivo', sans-serif;
+      font-weight: 500;
+      font-size: calc(10 * var(--u));
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #111111;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .nav-pill {
+      font-family: 'Archivo', sans-serif;
+      font-weight: 500;
+      font-size: calc(10 * var(--u));
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #111111;
+      border: 1px solid #111111;
+      border-radius: 9999px;
+      padding: calc(6 * var(--u)) calc(18 * var(--u));
+      text-decoration: none;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .nav-pill:hover {
+      background: #111111;
+      color: #ffffff;
+    }
+
+    @media (max-width: 767px), (orientation: portrait) {
+      .nav {
+        padding: 20px 22px;
+      }
+      .nav-links .hide-mobile {
+        display: none;
+      }
+    }
+
+    /* Scene (Sticky) */
+    .scene {
+      position: sticky;
+      top: 0;
+      width: 100%;
+      height: 100vh;
+      height: 100lvh;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #ffffff var(--edge-px, 44.8%), #111111 var(--edge-px, 44.8%));
+    }
+
+    /* Video element */
+    .hero-video {
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+      object-fit: fill;
+      will-change: transform;
+    }
+
+    /* Giant letters */
+    .giant-letters {
+      position: absolute;
+      bottom: calc(100% - var(--edge-px));
+      left: 0;
+      font-family: 'Anton', sans-serif;
+      font-size: calc(330 * var(--u));
+      line-height: 0.8;
+      color: #e9e9e9;
+      white-space: nowrap;
+      pointer-events: none;
+      mix-blend-mode: darken;
+      user-select: none;
+      will-change: transform;
+      transform-origin: left bottom;
+    }
+
+    @media (max-width: 767px), (orientation: portrait) {
+      .giant-letters {
+        font-size: calc(180 * var(--u));
+      }
+    }
+
+    /* Telemetry Panel */
+    .telemetry-panel {
+      position: absolute;
+      top: calc(52 * var(--u));
+      left: calc(26 * var(--u));
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .speed-readout {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: calc(10.5 * var(--u));
+      font-weight: 400;
+      color: #111111;
+      opacity: var(--ph, 0);
+      transition: opacity 0.3s ease;
+    }
+
+    .anim-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(4px);
+      padding: 3px 8px;
+      border-radius: 9999px;
+      font-size: 10px;
+      font-family: 'Archivo', sans-serif;
+      font-weight: 600;
+      color: #555;
+      width: max-content;
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #2f63ff;
+    }
+
+    .pulse-dot.active {
+      background: #16a34a;
+      box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.25);
+      animation: pulseDot 1s infinite;
+    }
+
+    /* Container Stencil Branding: TRACKORA */
+    .container-stencil {
+      position: absolute;
+      left: 48%;
+      bottom: calc(100vh - var(--edge-px) + calc(34 * var(--u)));
+      pointer-events: none;
+      z-index: 15;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: opacity 0.3s ease;
+      user-select: none;
+      opacity: 0;
+      transform: translateX(-50%);
+    }
+
+    .stencil-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: calc(9 * var(--u));
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      color: #2f63ff;
+      background: rgba(10, 16, 28, 0.85);
+      padding: calc(2 * var(--u)) calc(8 * var(--u));
+      border-radius: 4px;
+      border: 1px solid rgba(47, 99, 255, 0.35);
+      margin-bottom: calc(3 * var(--u));
+    }
+
+    .stencil-brand {
+      font-family: 'Anton', sans-serif;
+      font-size: calc(44 * var(--u));
+      line-height: 0.95;
+      letter-spacing: 0.18em;
+      color: #ffffff;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85), 0 0 20px rgba(47, 99, 255, 0.4);
+      background: linear-gradient(180deg, rgba(16, 24, 40, 0.75), rgba(10, 15, 26, 0.85));
+      backdrop-filter: blur(4px);
+      padding: calc(4 * var(--u)) calc(22 * var(--u));
+      border-radius: calc(6 * var(--u));
+      border: 1.5px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    .stencil-meta {
+      display: flex;
+      gap: calc(12 * var(--u));
+      font-family: 'JetBrains Mono', monospace;
+      font-size: calc(8.5 * var(--u));
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      color: rgba(255, 255, 255, 0.9);
+      margin-top: calc(4 * var(--u));
+      background: rgba(0, 0, 0, 0.6);
+      padding: calc(2 * var(--u)) calc(8 * var(--u));
+      border-radius: 4px;
+    }
+
+    @media (max-width: 767px), (orientation: portrait) {
+      .container-stencil {
+        left: 45%;
+        bottom: calc(100vh - var(--edge-px) + 20px);
+      }
+      .stencil-brand {
+        font-size: calc(28 * var(--u));
+        letter-spacing: 0.12em;
+        padding: 3px 14px;
+      }
+      .stencil-tag { font-size: 7px; }
+      .stencil-meta { font-size: 7px; gap: 6px; }
+    }
+
+    /* Scroll Hint */
+    .scroll-hint {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100vh - var(--edge-px) + 24px);
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+      z-index: 20;
+      transition: opacity 0.3s ease;
+    }
+
+    .scroll-hint span {
+      font-family: 'Archivo', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #111111;
+      background: rgba(255, 255, 255, 0.88);
+      padding: 5px 12px;
+      border-radius: 9999px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .mouse-icon {
+      width: 20px;
+      height: 32px;
+      border: 2px solid #111111;
+      border-radius: 12px;
+      position: relative;
+    }
+
+    .wheel {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      width: 3px;
+      height: 6px;
+      background: #111111;
+      border-radius: 2px;
+      transform: translateX(-50%);
+      animation: scrollWheel 1.5s infinite;
+    }
+
+    @keyframes scrollWheel {
+      0% { top: 5px; opacity: 1; }
+      100% { top: 15px; opacity: 0; }
+    }
+
+    @media (max-width: 767px), (orientation: portrait) {
+      .telemetry-panel {
+        top: 22px;
+        left: 20px;
+      }
+      .speed-readout {
+        font-size: 11px;
+      }
+      .scroll-hint {
+        display: none;
+      }
+    }
+
+    /* Ground Band */
+    .band {
+      position: absolute;
+      top: var(--edge-px);
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #111111;
+      overflow: hidden;
+      z-index: 10;
+    }
+
+    /* Horizontal Strip */
+    .strip {
+      position: absolute;
+      top: calc(76 * var(--u));
+      left: 0;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: calc(120 * var(--u));
+      white-space: nowrap;
+      color: #ffffff;
+      will-change: transform;
+    }
+
+    @media (max-width: 767px), (orientation: portrait) {
+      .strip {
+        top: calc(44 * var(--u));
+        gap: calc(56 * var(--u));
+        padding-left: 22px;
+      }
+    }
+
+    /* Lead block */
+    .lead-block {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: calc(64 * var(--u));
+      white-space: normal;
+    }
+
+    .lead-headline {
+      font-family: 'Anton', sans-serif;
+      font-size: calc(64 * var(--u));
+      line-height: 0.98;
+      text-transform: uppercase;
+      color: #ffffff;
+      width: max-content;
+      flex-shrink: 0;
+    }
+
+    .lead-headline .cobalt {
+      color: #2f63ff;
+      display: block;
+    }
+
+    .lead-paragraphs {
+      width: calc(250 * var(--u));
+      display: flex;
+      flex-direction: column;
+      gap: calc(14 * var(--u));
+      flex-shrink: 0;
+    }
+
+    .lead-paragraphs p {
+      font-family: 'Archivo', sans-serif;
+      font-weight: 400;
+      font-size: calc(12 * var(--u));
+      line-height: 1.5;
+      color: rgba(255, 255, 255, 0.62);
+    }
+
+    @media (max-width: 767px), (orientation: portrait) {
+      .lead-block {
+        flex-direction: column;
+        gap: 18px;
+      }
+      .lead-headline {
+        font-size: calc(46 * var(--u));
+      }
+      .lead-paragraphs {
+        width: calc(300 * var(--u));
+      }
+      .lead-paragraphs p {
+        font-size: calc(13 * var(--u));
+      }
+    }
+
+    /* Cards */
+    .card {
+      width: calc(270 * var(--u));
+      padding: 0 calc(30 * var(--u));
+      border-left: 1px solid rgba(255, 255, 255, 0.12);
+      display: flex;
+      flex-direction: column;
+      gap: calc(16 * var(--u));
+      white-space: normal;
+      flex-shrink: 0;
+    }
+
+    .card:first-child {
+      border-left: none;
+      padding-left: 0;
+    }
+
+    @media (max-width: 767px), (orientation: portrait) {
+      .card {
+        width: calc(250 * var(--u));
+      }
+    }
+
+    .card-icon {
+      width: calc(38 * var(--u));
+      height: calc(38 * var(--u));
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .card-icon svg {
+      width: 100%;
+      height: 100%;
+      stroke: #ffffff;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .card-title {
+      font-family: 'Anton', sans-serif;
+      font-size: calc(26 * var(--u));
+      line-height: 1.1;
+      text-transform: uppercase;
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      background-image: linear-gradient(90deg, #ffffff 0%, #2f63ff 50%, transparent 100%);
+      will-change: background-image;
+    }
+
+    .card-body {
+      font-family: 'Archivo', sans-serif;
+      font-size: calc(12.4 * var(--u));
+      line-height: 1.5;
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      background-image: linear-gradient(90deg, #ffffff 0%, #2f63ff 50%, transparent 100%);
+      will-change: background-image;
+    }
+
+    @media (max-width: 767px), (orientation: portrait) {
+      .card-body {
+        font-size: calc(13 * var(--u));
+      }
+    }
+
+    /* Band bottom pill */
+    .band-pill {
+      position: absolute;
+      left: 50%;
+      bottom: calc(36 * var(--u));
+      transform: translateX(-50%) translateY(calc((1 - var(--ph, 0)) * 24px));
+      font-family: 'Archivo', sans-serif;
+      font-size: calc(10 * var(--u));
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 9999px;
+      padding: calc(6 * var(--u)) calc(18 * var(--u));
+      text-decoration: none;
+      opacity: var(--ph, 0);
+      transition: opacity 0.4s ease, transform 0.4s ease, border-color 0.2s;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .band-pill:hover {
+      border-color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body>
+  <!-- Progress Bar -->
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <div class="track" id="track">
+    <!-- Absolute Nav -->
+    <header class="nav">
+      <a href="/login" class="nav-brand">Trackora</a>
+      <div class="nav-links">
+        <a href="/login" class="nav-pill">Skip to Login →</a>
+      </div>
+    </header>
+
+    <!-- Sticky Scene -->
+    <div class="scene" id="scene">
+      <!-- 1. The Video -->
+      <video
+        id="heroVideo"
+        class="hero-video"
+        muted
+        playsinline
+        preload="auto"
+        poster="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/2307e4bf-be39-42b4-b579-e168aeccabf0.jpg"
+      ></video>
+
+      <!-- 2. Giant Letters -->
+      <div class="giant-letters" id="giantLetters">OUR SERVICES</div>
+
+      <!-- 3. Telemetry Panel -->
+      <div class="telemetry-panel">
+        <div class="speed-readout" id="speedReadout">00 KM/H</div>
+        <div class="anim-indicator">
+          <span class="pulse-dot active" id="pulseDot"></span>
+          <small id="statusText">Intro Playing · 0%</small>
+        </div>
+      </div>
+
+      <!-- Container Company Name Stencil -->
+      <div class="container-stencil" id="containerStencil">
+        <div class="stencil-brand">TRACKORA</div>
+      </div>
+
+      <!-- Skip Intro Button -->
+      <div class="scroll-hint" id="scrollHint">
+        <a href="/login" class="nav-pill" style="background:#111;color:#fff;">Skip Intro →</a>
+      </div>
+
+      <!-- 4. Ground Band -->
+      <div class="band" id="band">
+        <div class="strip" id="strip">
+          <!-- Lead block -->
+          <div class="lead-block">
+            <div class="lead-headline">
+              EVERYTHING YOUR<br />FREIGHT NEEDS.<br /><span class="cobalt">UNDER ONE GROUP.</span>
+            </div>
+            <div class="lead-paragraphs">
+              <p>From air to sea, from customs clearance to the last mile, we bring decades of practice to every freight discipline.</p>
+              <p>One integrated network means one partner, one point of contact and full visibility from origin to destination.</p>
+            </div>
+          </div>
+
+          <!-- 5 Service Cards -->
+          <div class="card">
+            <div class="card-icon">
+              <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </div>
+            <div class="card-title">AIR<br />FREIGHT</div>
+            <div class="card-body">Express, priority and deferred options across global lanes, booked and tracked end to end.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">
+              <svg viewBox="0 0 24 24"><path d="M3 18l3 3h12l3-3M2 13h20M5 13l2-6h10l2 6M12 3v4"/></svg>
+            </div>
+            <div class="card-title">OCEAN<br />FREIGHT</div>
+            <div class="card-body">FCL and LCL sailings on every major trade lane, with carrier choice based on cost and transit time.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>
+            </div>
+            <div class="card-title">CUSTOMS<br />BROKERAGE</div>
+            <div class="card-body">Licensed in-house brokers for classification, duties and inspections, so goods clear first time.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">
+              <svg viewBox="0 0 24 24"><path d="M3 21h18M3 10l9-7 9 7v11H3V10zM9 21v-8h6v8"/></svg>
+            </div>
+            <div class="card-title">WAREHOUSING<br />AND 3PL</div>
+            <div class="card-body">Bonded and general storage, pick and pack, and distribution that plugs straight into transport.</div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">
+              <svg viewBox="0 0 24 24"><path d="M4 22h16M7 22V4l13 4M13 6v10a3 3 0 0 1-6 0M8 19h4"/></svg>
+            </div>
+            <div class="card-title">PROJECT<br />CARGO</div>
+            <div class="card-body">Oversized and heavy-lift moves, engineered, permitted and escorted from factory to foundation.</div>
+          </div>
+        </div>
+
+        <!-- Pill -->
+        <a href="/login" class="band-pill">Our services</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const track = document.getElementById('track');
+      const scene = document.getElementById('scene');
+      const video = document.getElementById('heroVideo');
+      const giantLetters = document.getElementById('giantLetters');
+      const speedReadout = document.getElementById('speedReadout');
+      const strip = document.getElementById('strip');
+      const cards = document.querySelectorAll('.card');
+      const playBtn = document.getElementById('playBtn');
+      const pulseDot = document.getElementById('pulseDot');
+      const statusText = document.getElementById('statusText');
+      const scrollHint = document.getElementById('scrollHint');
+      const progressFill = document.getElementById('progressFill');
+      const progressBar = document.getElementById('progressBar');
+      const menuBtn = document.getElementById('menuBtn');
+      const containerStencil = document.getElementById('containerStencil');
+
+      const A = 2.4;
+      let B = 2.0;
+      let duration = 4.04;
+      let curTime = 0;
+      let targetTime = 0;
+      let lastScrollY = window.scrollY;
+      let lastTime = performance.now();
+      let smoothSpeed = 0;
+      let vw = window.innerWidth;
+      let vh = window.innerHeight;
+      let edgePx = 0.448 * vh;
+      let isSeeking = false;
+      let pendingSeek = null;
+      let isPlaying = true;
+      let autoPlayProgress = 0;
+
+      const video1080 = 'https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/409763c0-95f4-49d3-a601-dc564d55072b.mp4';
+      const video720 = 'https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/b3718419-7a0a-478d-bfb0-0ff8bef7f3f7.mp4';
+      const initialSrc = vw <= 900 ? video720 : video1080;
+
+      video.src = initialSrc;
+      video.muted = true;
+      video.playsInline = true;
+      video.setAttribute('muted', '');
+      video.setAttribute('playsinline', '');
+      video.setAttribute('webkit-playsinline', '');
+      video.load();
+
+      fetch(initialSrc)
+        .then(res => res.blob())
+        .then(blob => {
+          const blobUrl = URL.createObjectURL(blob);
+          video.src = blobUrl;
+          video.load();
+        })
+        .catch(() => {});
+
+      video.addEventListener('loadedmetadata', function() {
+        if (video.duration && !isNaN(video.duration) && video.duration > 0) {
+          duration = video.duration;
+        }
+        layout();
+      });
+
+      function doSeek(t) {
+        if (video.readyState < 1) return;
+        if (isSeeking) {
+          pendingSeek = t;
+          return;
+        }
+        isSeeking = true;
+        try {
+          if ('fastSeek' in video) {
+            video.fastSeek(t);
+          } else {
+            video.currentTime = t;
+          }
+        } catch(e) {
+          video.currentTime = t;
+        }
+      }
+
+      video.addEventListener('seeked', function() {
+        isSeeking = false;
+        if (pendingSeek !== null) {
+          const next = pendingSeek;
+          pendingSeek = null;
+          doSeek(next);
+        }
+      });
+
+      function layout() {
+        vw = window.innerWidth;
+        vh = window.innerHeight;
+        const isNarrow = vw <= 768 || vw <= vh;
+
+        if (isNarrow) {
+          const videoWidth = 1.55 * vw;
+          const videoHeight = videoWidth * (1080 / 1920);
+          const videoLeft = vw * 0.5 - 0.40 * videoWidth;
+          const videoTop = 0.36 * vh - 0.448 * videoHeight;
+          edgePx = 0.36 * vh;
+
+          video.style.width = videoWidth + 'px';
+          video.style.height = videoHeight + 'px';
+          video.style.left = videoLeft + 'px';
+          video.style.top = videoTop + 'px';
+        } else {
+          const scale = Math.max(vw / 1920, vh / 1080);
+          const videoWidth = 1920 * scale;
+          const videoHeight = 1080 * scale;
+          const videoLeft = (vw - videoWidth) / 2;
+          const videoTop = (vh - videoHeight) / 2;
+          edgePx = videoTop + 0.448 * videoHeight;
+
+          video.style.width = videoWidth + 'px';
+          video.style.height = videoHeight + 'px';
+          video.style.left = videoLeft + 'px';
+          video.style.top = videoTop + 'px';
+        }
+
+        document.documentElement.style.setProperty('--edge-px', edgePx + 'px');
+
+        const stripWidth = strip.scrollWidth;
+        B = ((stripWidth + 0.45 * vw) / vw) * 1.1;
+        const totalHeight = (1 + A + B) * vh;
+        track.style.height = totalHeight + 'px';
+      }
+
+      window.addEventListener('resize', layout);
+      layout();
+      setTimeout(layout, 350);
+
+      function updateCardReveals() {
+        cards.forEach(card => {
+          const rect = card.getBoundingClientRect();
+          const cardLeft = rect.left;
+          const s = Math.min(1.6, Math.max(-0.4, (0.98 - cardLeft / vw) / 0.3)) * 100;
+          const s1 = Math.round(s - 34);
+          const s2 = Math.round(s - 6);
+          const s3 = Math.round(s + 26);
+          const grad = `linear-gradient(90deg, #ffffff ${s1}%, #2f63ff ${s2}%, transparent ${s3}%)`;
+          const title = card.querySelector('.card-title');
+          const body = card.querySelector('.card-body');
+          if (title) title.style.backgroundImage = grad;
+          if (body) body.style.backgroundImage = grad;
+        });
+      }
+
+      function tick(now) {
+        const dt = Math.max(1, now - lastTime);
+        lastTime = now;
+
+        const totalScroll = Math.max(1, (1 + A + B) * vh - vh);
+
+        let hasTriggeredNav = false;
+
+        if (isPlaying) {
+          autoPlayProgress += dt / (11 * 1000);
+          if (autoPlayProgress >= 1) {
+            autoPlayProgress = 1;
+            window.scrollTo(0, totalScroll);
+            if (!hasTriggeredNav) {
+              hasTriggeredNav = true;
+              statusText.textContent = 'Opening Trackora Login...';
+              setTimeout(function() {
+                window.location.href = '/login';
+              }, 600);
+            }
+          } else {
+            window.scrollTo(0, autoPlayProgress * totalScroll);
+          }
+        }
+
+        const sy = window.scrollY;
+        const dy = Math.abs(sy - lastScrollY);
+        lastScrollY = sy;
+
+        const rawSpeed = Math.min(99, (dy / (dt / 1000)) / 32);
+        smoothSpeed += (rawSpeed - smoothSpeed) * 0.15;
+        const displaySpeed = String(Math.min(99, Math.round(smoothSpeed))).padStart(2, '0');
+        speedReadout.textContent = `${displaySpeed} KM/H`;
+
+        const q = Math.min(1, Math.max(0, sy / (A * vh)));
+        targetTime = q * Math.max(0, duration - 1 / 48);
+        curTime += (targetTime - curTime) * 0.35;
+
+        if (Math.abs(curTime - video.currentTime) > 1 / 60) {
+          doSeek(curTime);
+        }
+
+        const ph = q >= 0.94 ? 1 : 0;
+        document.documentElement.style.setProperty('--ph', ph);
+
+        const r = Math.min(1, Math.max(0, (sy - A * vh) / (B * vh)));
+        const stripWidth = strip.scrollWidth;
+        const stripTranslateX = vw - r * (stripWidth + 0.45 * vw);
+        strip.style.transform = `translateX(${stripTranslateX}px)`;
+
+        const lettersWidth = giantLetters.scrollWidth;
+        const lettersTranslateX = vw - r * (lettersWidth + vw);
+        giantLetters.style.transform = `translateX(${lettersTranslateX}px)`;
+
+        const currentProg = Math.min(1, Math.max(0, sy / totalScroll));
+        progressFill.style.width = (currentProg * 100).toFixed(1) + '%';
+        const pct = Math.round(currentProg * 100);
+        statusText.textContent = isPlaying ? 'Auto-Playing Story' : pct + '% Scrubbed';
+        scrollHint.style.opacity = Math.max(0, 1 - pct / 15);
+
+        if (containerStencil) {
+          const stencilOpacity = q >= 0.15 ? Math.min(1, (q - 0.15) / 0.2) : 0;
+          containerStencil.style.opacity = String(stencilOpacity);
+        }
+
+        if (currentProg >= 0.985 && !hasTriggeredNav) {
+          hasTriggeredNav = true;
+          statusText.textContent = 'Opening Trackora Login...';
+          setTimeout(function() {
+            window.location.href = '/login';
+          }, 600);
+        }
+
+        updateCardReveals();
+
+        requestAnimationFrame(tick);
+      }
+
+      requestAnimationFrame(tick);
+
+      if (progressBar) {
+        progressBar.addEventListener('click', function(e) {
+        const rect = progressBar.getBoundingClientRect();
+        const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+        const totalScroll = Math.max(1, (1 + A + B) * vh - vh);
+        window.scrollTo({ top: ratio * totalScroll, behavior: 'smooth' });
+      });
+
+      // Recorder mode ?rec=1
+      if (window.location.search.includes('rec=1')) {
+        function cubicBezier(t) {
+          const p1 = 0.05, p2 = 0.95;
+          const u = 1 - t;
+          return 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t;
+        }
+
+        window.__recTime = function(vEl, t) {
+          const totalT = 11;
+          const normT = Math.min(1, Math.max(0, t / totalT));
+          let prog = 0;
+          if (normT < 0.04) {
+            prog = 0;
+          } else if (normT > 0.96) {
+            prog = 1;
+          } else {
+            const easeT = (normT - 0.04) / 0.92;
+            prog = cubicBezier(easeT);
+          }
+          const maxScroll = (1 + A + B) * vh - vh;
+          window.scrollTo(0, prog * maxScroll);
+          return vEl ? vEl.currentTime : curTime;
+        };
+      }
+    })();
+  </script>
+</body>
+</html>
