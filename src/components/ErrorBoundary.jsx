@@ -41,12 +41,12 @@ export default class ErrorBoundary extends React.Component {
         >
           <div style={{ fontSize: 42, marginBottom: 12 }}>⚠️</div>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#991b1b', marginBottom: 8 }}>
-            Unable to display order details
+            {this.props.title || 'Something went wrong'}
           </h2>
           <p style={{ color: '#4b5563', fontSize: 14, marginBottom: 20 }}>
             {this.state.error?.message || 'An unexpected rendering error occurred.'}
           </p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
               className="btn sm"
@@ -85,6 +85,29 @@ export default class ErrorBoundary extends React.Component {
               }}
             >
               ← Go Back
+            </button>
+            <button
+              type="button"
+              className="btn sm outline"
+              style={{
+                padding: '8px 14px',
+                borderRadius: 8,
+                fontWeight: 600,
+                fontSize: 12,
+                cursor: 'pointer',
+                color: '#dc2626',
+                borderColor: '#fca5a5',
+              }}
+              onClick={() => {
+                try {
+                  sessionStorage.removeItem('dt_user_active_order');
+                  localStorage.removeItem('trackora_custom_logo');
+                } catch {}
+                this.resetError();
+                window.location.reload();
+              }}
+            >
+              🧹 Clear Cache & Reload
             </button>
           </div>
         </div>

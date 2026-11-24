@@ -3,8 +3,24 @@ import { api } from '../services/api';
 import { closeSocket, getSocket } from '../services/socket';
 import { TK, DEFAULT_SETTINGS } from '../utils/helpers';
 
-const Ctx = createContext(null);
-export const useApp = () => useContext(Ctx);
+const defaultContextValue = {
+  user: null,
+  booting: false,
+  settings: DEFAULT_SETTINGS,
+  toasts: [],
+  notes: [],
+  toast: () => {},
+  dismiss: () => {},
+  markRead: () => {},
+  loadSettings: () => {},
+  setSettings: () => {},
+  login: async () => {},
+  register: async () => {},
+  logout: () => {},
+};
+
+const Ctx = createContext(defaultContextValue);
+export const useApp = () => useContext(Ctx) || defaultContextValue;
 
 export function AppProvider({ children }) {
   const [user, setUser] = useState(null);

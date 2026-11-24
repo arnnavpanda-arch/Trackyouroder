@@ -1655,7 +1655,7 @@ export function MyOrders() {
 
   if (activeOrderId) {
     return (
-      <ErrorBoundary onReset={handleBackToList}>
+      <ErrorBoundary title="Unable to display order details" onReset={handleBackToList}>
         <OrderDetails orderId={activeOrderId} onBack={handleBackToList} />
       </ErrorBoundary>
     );
