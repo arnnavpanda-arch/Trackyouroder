@@ -62,7 +62,7 @@ const cols = [
 ];
 
 export function UserDashboard() {
-  const { user } = useApp();
+  const { user, settings } = useApp() || {};
   const nav = useNavigate();
   const { data, loading, error, reload } = useLiveData(() => api.myOrders(), []);
   if (loading) return <Spinner />;
@@ -124,7 +124,7 @@ export function UserDashboard() {
 
 export function PlaceOrder() {
   const nav = useNavigate();
-  const { toast, user, socket } = useApp() || {};
+  const { toast, user, socket, settings } = useApp() || {};
   const [pricing, setPricing] = useState(() => getPricing());
   const [v, setV] = useState({
     pickup: '',
@@ -342,9 +342,9 @@ export function PlaceOrder() {
     if (!dropDistrict) {
       errors.dropDistrict = 'Please select drop district';
     }
-    // Mandatory Google Maps Drop URL
-    if (!dropMapLink || !dropMapLink.trim()) {
-      errors.dropMapLink = 'Drop location Google Maps URL is compulsory / mandatory. Please paste the Maps link.';
+    // Drop location verification (Google Maps Drop URL or GPS or address)
+    if (!dropCoords && (!dropMapLink || !dropMapLink.trim()) && (!v.drop || v.drop.trim().length < 3)) {
+      errors.dropMapLink = 'Please provide a drop Google Maps link or enter a drop street address.';
     }
     // Strict intra-state delivery rule
     if (pickupState.trim().toLowerCase() !== dropState.trim().toLowerCase()) {
@@ -373,7 +373,16 @@ export function PlaceOrder() {
       return;
     }
 
-    const effectiveDropCoords = directCoords || dropCoords;
+    let effectiveDropCoords = directCoords || dropCoords;
+    if (!effectiveDropCoords && dropMapLink && dropMapLink.trim()) {
+      try {
+        const resolved = await handleResolveMapLink(dropMapLink.trim());
+        if (resolved && resolved.lat != null) {
+          effectiveDropCoords = { lat: resolved.lat, lng: resolved.lng };
+        }
+      } catch {}
+    }
+
     if (!effectiveDropCoords && !dropMapLink.trim() && !skipLocation) {
       setShowLiveLocationModal(true);
       return;
@@ -1454,7 +1463,7 @@ export function PlaceOrder() {
 export function MyOrders() {
   const location = useLocation();
   const nav = useNavigate();
-  const { user, toast } = useApp();
+  const { user, toast, settings } = useApp() || {};
   const [cancellingOrder, setCancellingOrder] = useState(null);
   const [repayingOrder, setRepayingOrder] = useState(null);
   const [receiptOrder, setReceiptOrder] = useState(null);
@@ -1646,7 +1655,7 @@ export function MyOrders() {
 
   if (activeOrderId) {
     return (
-      <ErrorBoundary onReset={handleBackToList}>
+      <ErrorBoundary title="Unable to display order details" onReset={handleBackToList}>
         <OrderDetails orderId={activeOrderId} onBack={handleBackToList} />
       </ErrorBoundary>
     );

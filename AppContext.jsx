@@ -3,8 +3,24 @@ import { api } from '../services/api';
 import { closeSocket, getSocket } from '../services/socket';
 import { TK, DEFAULT_SETTINGS } from '../utils/helpers';
 
-const Ctx = createContext(null);
-export const useApp = () => useContext(Ctx);
+const defaultContextValue = {
+  user: null,
+  booting: false,
+  settings: DEFAULT_SETTINGS,
+  toasts: [],
+  notes: [],
+  toast: () => {},
+  dismiss: () => {},
+  markRead: () => {},
+  loadSettings: () => {},
+  setSettings: () => {},
+  login: async () => {},
+  register: async () => {},
+  logout: () => {},
+};
+
+const Ctx = createContext(defaultContextValue);
+export const useApp = () => useContext(Ctx) || defaultContextValue;
 
 export function AppProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -35,6 +51,22 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     loadSettings();
+
+    // Auto-sync custom branding & logo from MongoDB across mobile and other devices
+    const onFocusOrVisible = () => {
+      if (document.visibilityState === 'visible') {
+        loadSettings();
+      }
+    };
+    window.addEventListener('visibilitychange', onFocusOrVisible);
+    window.addEventListener('focus', onFocusOrVisible);
+
+    const timer = setInterval(loadSettings, 10000);
+    return () => {
+      window.removeEventListener('visibilitychange', onFocusOrVisible);
+      window.removeEventListener('focus', onFocusOrVisible);
+      clearInterval(timer);
+    };
   }, [loadSettings]);
 
   const toast = useCallback((message, type = 'info') => {
