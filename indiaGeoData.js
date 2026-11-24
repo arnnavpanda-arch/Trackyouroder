@@ -1,4 +1,4 @@
-// Comprehensive List of All 28 Indian States & 8 Union Territories with Districts (Server)
+// Comprehensive List of All 28 Indian States & 8 Union Territories with Districts
 
 export const INDIA_STATES_DATA = {
   'Andhra Pradesh': [
@@ -175,6 +175,7 @@ export const INDIA_STATES_DATA = {
     'Murshidabad', 'Nadia', 'North 24 Parganas', 'Paschim Bardhaman', 'Paschim Medinipur',
     'Purba Bardhaman', 'Purba Medinipur', 'Purulia', 'South 24 Parganas', 'Uttar Dinajpur'
   ],
+  // 8 Union Territories
   'Andaman and Nicobar Islands': [
     'Nicobar', 'North and Middle Andaman', 'South Andaman (Port Blair)'
   ],
@@ -206,16 +207,23 @@ export const INDIA_STATES_DATA = {
 
 export const ALL_INDIAN_STATES = Object.keys(INDIA_STATES_DATA).sort();
 
+/**
+ * Returns default list of serviceable regions (all 36 states/UTs with enabled: true).
+ */
 export function getDefaultServiceableRegions() {
   return ALL_INDIAN_STATES.map((state) => ({
     state,
-    enabled: true,
+    enabled: true, // by default active
     districts: [...INDIA_STATES_DATA[state]],
   }));
 }
 
+/**
+ * Check if a state and district are currently active / approved by admin.
+ */
 export function isRegionEligible(state, district, serviceableRegions) {
   if (!serviceableRegions || !Array.isArray(serviceableRegions) || serviceableRegions.length === 0) {
+    // If no custom restrictions configured, all regions default to eligible
     return true;
   }
   const match = serviceableRegions.find(

@@ -1,54 +1,19 @@
-import { Server } from 'socket.io';
-import { Order } from './models/Order.js';
+import { io } from 'socket.io-client';
+import { MOCK } from '../utils/helpers';
+import { bus } from './mock';
 
-let ioInstance = null;
+let real = null;
+const getSocketUrl = () => {
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return `${window.location.protocol}//${window.location.hostname}:5001`;
+  }
+  return import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
+};
 
-export function initSocket(httpServer, clientOrigin) {
-  ioInstance = new Server(httpServer, {
-    cors: {
-      origin: '*',
-      methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
-      credentials: true,
-    },
-    transports: ['websocket', 'polling'],
-  });
-
-  ioInstance.on('connection', (socket) => {
-    // console.log(`[Socket.io] Client connected: ${socket.id}`);
-
-    // Listen for agent GPS updates
-    socket.on('agentLocation', async (data) => {
-      if (!data || !data.orderId || data.lat == null || data.lng == null) return;
-      try {
-        const agentLoc = {
-          lat: Number(data.lat),
-          lng: Number(data.lng),
-          isExact: Boolean(data.isExact),
-          accuracy: data.accuracy || null,
-          lastUpdate: Date.now(),
-        };
-        await Order.findOneAndUpdate({ id: data.orderId }, { $set: { agentLoc } });
-        ioInstance.emit('agentLocationUpdated', {
-          orderId: data.orderId,
-          agentId: data.agentId,
-          lat: Number(data.lat),
-          lng: Number(data.lng),
-          isExact: Boolean(data.isExact),
-          accuracy: data.accuracy || null,
-        });
-      } catch (err) {
-        console.error('Socket agentLocation error:', err.message);
-      }
-    });
-
-    socket.on('disconnect', () => {
-      // console.log(`[Socket.io] Client disconnected: ${socket.id}`);
-    });
-  });
-
-  return ioInstance;
-}
-
-export function getIO() {
-  return ioInstance;
-}
+// Returns an object exposing on / off / emit (socket.io-client or the demo bus).
+export const getSocket = (token) => {
+  if (MOCK) return bus;
+  if (!real) real = io(getSocketUrl(), { auth: { token }, transports: ['websocket'] });
+  return real;
+};
+export const closeSocket = () => { real?.disconnect(); real = null; };

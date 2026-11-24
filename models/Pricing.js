@@ -91,4 +91,4 @@ const pricingSchema = new mongoose.Schema(
   }
 );
 
-export const Pricing = mongoose.model('Pricing', pricingSchema);
+export const Pricing = mongoose.models.Pricing || mongoose.model('Pricing', pricingSchema);

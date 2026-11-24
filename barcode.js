@@ -15,13 +15,11 @@ const CODE128_PATTERNS = [
 
 /**
  * Encodes text into binary Code 128 module sequence (1 = dark bar, 0 = light space).
- * Standard Code 128 (Set B) supports all standard ASCII characters.
  */
 export function encodeCode128(text) {
   const safeText = String(text || '').trim();
   if (!safeText) return [];
 
-  // Start with Start B (symbol index 104)
   let checkSum = 104;
   const indices = [104];
 
@@ -34,7 +32,7 @@ export function encodeCode128(text) {
 
   const checkDigit = checkSum % 103;
   indices.push(checkDigit);
-  indices.push(106); // Stop symbol
+  indices.push(106);
 
   const modules = [];
   for (const idx of indices) {
@@ -51,33 +49,4 @@ export function encodeCode128(text) {
   }
 
   return modules;
-}
-
-/**
- * Returns runs of bars: [{ x, width }] for drawing in Canvas, SVG, or PDFKit
- */
-export function getBarcodeBars(text, barWidth = 1.2, quietZone = 10) {
-  const modules = encodeCode128(text);
-  const bars = [];
-  let currentX = quietZone;
-  let barStart = null;
-
-  for (let i = 0; i < modules.length; i++) {
-    if (modules[i] === 1) {
-      if (barStart === null) barStart = currentX;
-    } else {
-      if (barStart !== null) {
-        bars.push({ x: barStart, width: currentX - barStart });
-        barStart = null;
-      }
-    }
-    currentX += barWidth;
-  }
-
-  if (barStart !== null) {
-    bars.push({ x: barStart, width: currentX - barStart });
-  }
-
-  const totalWidth = currentX + quietZone;
-  return { bars, totalWidth, modulesCount: modules.length };
 }

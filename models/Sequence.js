@@ -12,7 +12,7 @@ const sequenceSchema = new mongoose.Schema({
   },
 });
 
-export const Sequence = mongoose.model('Sequence', sequenceSchema);
+export const Sequence = mongoose.models.Sequence || mongoose.model('Sequence', sequenceSchema);
 
 export async function getNextOrderId() {
   const record = await Sequence.findOneAndUpdate(

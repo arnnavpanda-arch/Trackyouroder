@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 
+let cachedPromise = null;
+
 export const connectDB = async () => {
   if (mongoose.connection.readyState >= 1) {
     return mongoose.connection;
@@ -10,14 +12,19 @@ export const connectDB = async () => {
     throw new Error('MONGODB_URI is not defined. Please add MONGODB_URI in your Vercel Project Settings > Environment Variables.');
   }
 
-  try {
-    const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 5000,
+  if (!cachedPromise) {
+    cachedPromise = mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 8000,
+      bufferCommands: false,
+    }).then((conn) => {
+      console.log(`[Database] MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
+      return conn;
+    }).catch((err) => {
+      cachedPromise = null;
+      console.error(`[Database Error] Failed to connect to MongoDB: ${err.message}`);
+      throw err;
     });
-    console.log(`[Database] MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
-    return conn;
-  } catch (err) {
-    console.error(`[Database Error] Failed to connect to MongoDB: ${err.message}`);
-    throw err;
   }
+
+  return cachedPromise;
 };

@@ -12,6 +12,11 @@ const pts = places.map((n, i) => ({
 
 export async function seedDatabase() {
   try {
+    const existingCount = await User.estimatedDocumentCount();
+    if (existingCount > 0) {
+      return; // Database is already seeded, avoid redundant queries
+    }
+
     // 1. Seed Pricing
     let pricing = await Pricing.findOne();
     if (!pricing) {
