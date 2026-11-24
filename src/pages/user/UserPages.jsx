@@ -62,7 +62,7 @@ const cols = [
 ];
 
 export function UserDashboard() {
-  const { user } = useApp();
+  const { user, settings } = useApp() || {};
   const nav = useNavigate();
   const { data, loading, error, reload } = useLiveData(() => api.myOrders(), []);
   if (loading) return <Spinner />;
@@ -124,7 +124,7 @@ export function UserDashboard() {
 
 export function PlaceOrder() {
   const nav = useNavigate();
-  const { toast, user, socket } = useApp() || {};
+  const { toast, user, socket, settings } = useApp() || {};
   const [pricing, setPricing] = useState(() => getPricing());
   const [v, setV] = useState({
     pickup: '',
@@ -1454,7 +1454,7 @@ export function PlaceOrder() {
 export function MyOrders() {
   const location = useLocation();
   const nav = useNavigate();
-  const { user, toast } = useApp();
+  const { user, toast, settings } = useApp() || {};
   const [cancellingOrder, setCancellingOrder] = useState(null);
   const [repayingOrder, setRepayingOrder] = useState(null);
   const [receiptOrder, setReceiptOrder] = useState(null);
