@@ -7,14 +7,16 @@
     <title>Trackora · Delivery Tracking & Order Management</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600&family=JetBrains+Mono:wght@400&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="/assets/index-DR8fRGpK.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BylffmAj.css">
+    <script>
+      window.settings = window.settings || { serviceable_regions: [] };
+    </script>
   </head>
+  <body>
     <audio id="paymentSound" preload="auto">
       <source src="/payment-success.mp3" type="audio/mpeg" />
       <source src="/payment-success.wav" type="audio/wav" />
     </audio>
     <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
