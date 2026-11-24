@@ -59,7 +59,11 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    const exists = await User.findOne({ email: email.toLowerCase() });
+    const [exists, settings] = await Promise.all([
+      User.findOne({ email: email.toLowerCase() }).lean(),
+      role !== 'admin' ? Settings.findOne().lean() : null,
+    ]);
+
     if (exists) {
       return res.status(400).json({ message: 'Email already registered' });
     }
@@ -72,7 +76,6 @@ router.post('/register', async (req, res) => {
       if (!district || !district.trim()) {
         return res.status(400).json({ message: 'District selection is required for registration' });
       }
-      const settings = await Settings.findOne();
       if (settings?.serviceable_regions?.length > 0) {
         const eligible = isRegionEligible(state, district, settings.serviceable_regions);
         if (!eligible) {
