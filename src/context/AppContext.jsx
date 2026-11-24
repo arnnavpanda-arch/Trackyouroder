@@ -35,6 +35,22 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     loadSettings();
+
+    // Auto-sync custom branding & logo from MongoDB across mobile and other devices
+    const onFocusOrVisible = () => {
+      if (document.visibilityState === 'visible') {
+        loadSettings();
+      }
+    };
+    window.addEventListener('visibilitychange', onFocusOrVisible);
+    window.addEventListener('focus', onFocusOrVisible);
+
+    const timer = setInterval(loadSettings, 10000);
+    return () => {
+      window.removeEventListener('visibilitychange', onFocusOrVisible);
+      window.removeEventListener('focus', onFocusOrVisible);
+      clearInterval(timer);
+    };
   }, [loadSettings]);
 
   const toast = useCallback((message, type = 'info') => {

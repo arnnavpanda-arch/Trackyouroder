@@ -83,18 +83,49 @@ export default function SystemSettings() {
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) {
-      toast('Please upload an image under 3MB', 'error');
+    if (file.size > 8 * 1024 * 1024) {
+      toast('Please upload an image under 8MB', 'error');
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = reader.result;
-      handleChange('logo_url', dataUrl);
-      try {
-        localStorage.setItem('trackora_custom_logo', dataUrl);
-      } catch {}
-      toast('Logo uploaded! Click "Save Settings" to apply to the database & all portals.', 'info');
+      const img = new Image();
+      img.onload = () => {
+        // Optimize logo resolution to max 320x320 for lightning-fast database storage & mobile loading
+        const maxDim = 320;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const optimizedDataUrl = canvas.toDataURL('image/png', 0.9);
+
+        handleChange('logo_url', optimizedDataUrl);
+        try {
+          localStorage.setItem('trackora_custom_logo', optimizedDataUrl);
+        } catch {}
+        toast('Logo ready! Click "Save Settings" below to save to the database & apply to all devices.', 'info');
+      };
+      img.onerror = () => {
+        const rawDataUrl = reader.result;
+        handleChange('logo_url', rawDataUrl);
+        try {
+          localStorage.setItem('trackora_custom_logo', rawDataUrl);
+        } catch {}
+        toast('Logo ready! Click "Save Settings" below to save to database.', 'info');
+      };
+      img.src = reader.result;
     };
     reader.readAsDataURL(file);
   };
