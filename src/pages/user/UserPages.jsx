@@ -1522,6 +1522,24 @@ export function MyOrders() {
           >
             <span>🖨️</span> Print
           </button>
+          {o.deliveryOtp && o.status !== 'Delivered' && o.status !== 'Cancelled' && (
+            <span
+              style={{
+                background: '#eff6ff',
+                color: '#1d4ed8',
+                fontSize: 11,
+                fontWeight: 800,
+                padding: '2px 7px',
+                borderRadius: 4,
+                border: '1px solid #bfdbfe',
+                fontFamily: 'monospace',
+                letterSpacing: '0.05em',
+              }}
+              title="Share this 4-digit Delivery OTP with your courier when package arrives"
+            >
+              🔐 OTP: {o.deliveryOtp}
+            </span>
+          )}
           {(o.paymentStatus === 'verified' || o.paymentStatus === 'paid') && (
             <span
               style={{

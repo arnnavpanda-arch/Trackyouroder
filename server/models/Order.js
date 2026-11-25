@@ -142,6 +142,18 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: 'cod',
     },
+    cashCollected: {
+      type: Boolean,
+      default: false,
+    },
+    cashCollectedAt: {
+      type: Date,
+      default: null,
+    },
+    deliveryOtp: {
+      type: String,
+      default: '',
+    },
     paymentStatus: {
       type: String,
       default: 'pending_pickup',

@@ -16,16 +16,22 @@ const generateToken = (id) => {
 // @route   POST /api/auth/login
 // @desc    Authenticate user & get token
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  const identifier = (req.body.email || req.body.userId || req.body.username || '').trim();
+  const { password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password are required' });
+  if (!identifier || !password) {
+    return res.status(400).json({ message: 'User ID / Email and password are required' });
   }
 
   try {
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({
+      $or: [
+        { email: identifier.toLowerCase() },
+        { phone: identifier },
+      ],
+    });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ message: 'Invalid credentials. Please verify your User ID / Email and password.' });
     }
 
     if (!user.active) {

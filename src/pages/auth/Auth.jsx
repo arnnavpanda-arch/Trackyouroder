@@ -235,9 +235,10 @@ function AuthFlow({ initialAction = 'signin' }) {
   const { user, login, register, toast, settings } = useApp();
   const nav = useNavigate();
 
-  // step: 'action' (Sign In or Create Account) -> 'role' (Customer, Agent, Admin) -> 'form'
-  const [step, setStep] = useState('action');
+  // Centralized unified login: 'signin' shows unified User ID/Email + password directly.
+  // 'register' allows selecting Customer vs Agent to create an account.
   const [action, setAction] = useState(initialAction); // 'signin' | 'register'
+  const [step, setStep] = useState(initialAction === 'signin' ? 'form' : 'role');
   const [selectedRole, setSelectedRole] = useState('user');
 
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -286,57 +287,45 @@ function AuthFlow({ initialAction = 'signin' }) {
 
   const handleChooseAction = (chosenAction) => {
     setAction(chosenAction);
-    setStep('role');
+    setStep(chosenAction === 'signin' ? 'form' : 'role');
+    setErrs({});
   };
 
   const handleChooseRole = (chosenRole) => {
     setSelectedRole(chosenRole);
-    const roleInfo = ROLES.find((r) => r.id === chosenRole) || ROLES[0];
-    if (action === 'signin' && MOCK) {
-      setV({
-        name: '',
-        email: roleInfo.demoEmail,
-        password: roleInfo.demoPassword,
-        phone: '',
-        state: '',
-        district: '',
-        vehicleType: 'Bike',
-        vehicleNumber: '',
-        drivingLicense: '',
-        emergencyContact: '',
-        experienceYears: '1-2 Years',
-      });
-    } else {
-      setV({
-        name: '',
-        email: '',
-        phone: '',
-        password: '',
-        state: '',
-        district: '',
-        vehicleType: 'Bike',
-        vehicleNumber: '',
-        drivingLicense: '',
-        emergencyContact: '',
-        experienceYears: '1-2 Years',
-      });
-    }
+    setV({
+      name: '',
+      email: '',
+      phone: '',
+      password: '',
+      state: '',
+      district: '',
+      vehicleType: 'Bike',
+      vehicleNumber: '',
+      drivingLicense: '',
+      emergencyContact: '',
+      experienceYears: '1-2 Years',
+    });
     setAgreeTerms(false);
     setErrs({});
     setStep('form');
   };
 
-  const fillDemo = () => {
+  const fillDemo = (roleId) => {
+    const roleInfo = ROLES.find((r) => r.id === roleId) || ROLES[0];
     setV((prev) => ({
       ...prev,
-      email: currentRole.demoEmail,
-      password: currentRole.demoPassword
+      email: roleInfo.demoEmail,
+      password: roleInfo.demoPassword,
     }));
   };
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    const er = validate(v, { email: rules.email, password: rules.required('Password') });
+    const er = validate(v, {
+      email: rules.required('User ID or Email'),
+      password: rules.required('Password'),
+    });
     setErrs(er);
     if (Object.keys(er).length) return;
     setBusy(true);
@@ -417,8 +406,8 @@ function AuthFlow({ initialAction = 'signin' }) {
     <div className="auth">
       <Hero />
       <section className="auth-card">
-        {step === 'action' && (
-          <div className="auth-choice-container">
+        {action === 'signin' && (
+          <form onSubmit={handleLoginSubmit} noValidate>
             <div className="auth-logo-header">
               <div className="auth-round-logo-box" title="Trackora Logo">
                 {activeLogo ? (
@@ -430,44 +419,89 @@ function AuthFlow({ initialAction = 'signin' }) {
                 )}
               </div>
             </div>
-            <h2>Welcome to Trackora</h2>
-            <p className="sub">Select an option to continue</p>
-            <div className="auth-action-buttons">
-              <button
-                type="button"
-                className="btn-lightblue"
-                onClick={() => handleChooseAction('signin')}
-              >
-                Sign In
-              </button>
 
+            <h2>Sign in to Trackora</h2>
+            <p className="sub">Enter your User ID / Email and password to access your dashboard</p>
+
+            <Field label="User ID or Email" error={errs.email}>
+              <input
+                type="text"
+                value={v.email}
+                onChange={set('email')}
+                placeholder="User ID or email address"
+                autoComplete="username"
+                autoFocus
+              />
+            </Field>
+
+            <Field label="Password" error={errs.password}>
+              <input
+                type="password"
+                value={v.password}
+                onChange={set('password')}
+                placeholder="••••••••"
+                autoComplete="current-password"
+              />
+            </Field>
+
+            <button className="btn block big" disabled={busy} style={{ marginTop: 8 }}>
+              {busy ? 'Signing in…' : 'Sign In'}
+            </button>
+
+            {MOCK && (
+              <div className="demo-quick-bar" style={{ marginTop: 14 }}>
+                <small style={{ color: '#64748b', display: 'block', marginBottom: 6 }}>Quick demo accounts:</small>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {ROLES.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      className="demo-quick-btn"
+                      style={{ fontSize: 11, padding: '4px 8px' }}
+                      onClick={() => fillDemo(r.id)}
+                    >
+                      {r.icon} {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="alt">
+              Need a new account?{' '}
               <button
                 type="button"
-                className="btn-lightblue secondary"
-                onClick={() => handleChooseAction('register')}
+                className="link"
+                onClick={() => {
+                  setAction('register');
+                  setStep('role');
+                  setErrs({});
+                }}
               >
-                Create Account
+                Create account
               </button>
-            </div>
-          </div>
+            </p>
+          </form>
         )}
 
-        {step === 'role' && (
+        {action === 'register' && step === 'role' && (
           <div className="auth-choice-container">
             <button
               type="button"
               className="auth-back-btn"
-              onClick={() => setStep('action')}
+              onClick={() => {
+                setAction('signin');
+                setStep('form');
+                setErrs({});
+              }}
             >
-              ← Back to options
+              ← Back to Sign In
             </button>
-            <h2>Select Account Type</h2>
-            <p className="sub">
-              Choose your account to {action === 'signin' ? 'sign in' : 'create an account'}
-            </p>
+            <h2>Create an Account</h2>
+            <p className="sub">Select your account profile type</p>
 
             <div className="auth-role-cards">
-              {ROLES.filter((r) => action === 'signin' ? true : (r.id !== 'admin' && r.id !== 'district_admin')).map((r) => (
+              {ROLES.filter((r) => r.id === 'user' || r.id === 'agent').map((r) => (
                 <button
                   key={r.id}
                   type="button"
@@ -483,74 +517,22 @@ function AuthFlow({ initialAction = 'signin' }) {
                 </button>
               ))}
             </div>
-          </div>
-        )}
 
-        {step === 'form' && action === 'signin' && (
-          <form onSubmit={handleLoginSubmit} noValidate>
-            <button
-              type="button"
-              className="auth-back-btn"
-              onClick={() => setStep('role')}
-            >
-              ← Back to account types
-            </button>
-
-            <div className={`role-badge-pill ${currentRole.id}`}>
-              <span>{currentRole.icon}</span>
-              <span>{currentRole.label} Account</span>
-            </div>
-
-            <h2>Sign in to Trackora</h2>
-            <p className="sub">Enter your credentials for {currentRole.label} access</p>
-
-            <Field label="Email address" error={errs.email}>
-              <input
-                type="email"
-                value={v.email}
-                onChange={set('email')}
-                placeholder={`${currentRole.id}@demo.com`}
-                autoComplete="email"
-              />
-            </Field>
-
-            <Field label="Password" error={errs.password}>
-              <input
-                type="password"
-                value={v.password}
-                onChange={set('password')}
-                placeholder="••••••••"
-                autoComplete="current-password"
-              />
-            </Field>
-
-            <button className="btn block" disabled={busy}>
-              {busy ? 'Signing in…' : `Sign in as ${currentRole.label}`}
-            </button>
-
-            {MOCK && (
-              <div className="demo-quick-bar">
-                <small>Quick demo credentials</small>
-                <button type="button" className="demo-quick-btn" onClick={fillDemo}>
-                  Auto-fill {currentRole.label}
-                </button>
-              </div>
-            )}
-
-            <p className="alt">
-              Need a new account?{' '}
+            <p className="alt" style={{ marginTop: 16 }}>
+              Already have an account?{' '}
               <button
                 type="button"
                 className="link"
                 onClick={() => {
-                  setAction('register');
+                  setAction('signin');
+                  setStep('form');
                   setErrs({});
                 }}
               >
-                Create account
+                Sign In
               </button>
             </p>
-          </form>
+          </div>
         )}
 
         {step === 'form' && action === 'register' && (
@@ -806,18 +788,11 @@ function AuthFlow({ initialAction = 'signin' }) {
                 className="link"
                 onClick={() => {
                   setAction('signin');
-                  if (MOCK) {
-                    setV({
-                      name: '',
-                      email: currentRole.demoEmail,
-                      password: currentRole.demoPassword,
-                      phone: ''
-                    });
-                  }
+                  setStep('form');
                   setErrs({});
                 }}
               >
-                Sign in
+                Sign In
               </button>
             </p>
           </form>

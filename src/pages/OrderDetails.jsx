@@ -17,6 +17,7 @@ import { ErrorBox, Spinner } from '../components/UI';
 import { NEXT, fmtDate, encodeOrderSlug, decodeOrderSlug } from '../utils/helpers';
 import { getResilientDeviceLocation, parseMapLinkOrAddress } from '../utils/geoHelper';
 import DeliveryCelebration from '../components/DeliveryCelebration';
+import DeliveryVerificationModal from '../components/DeliveryVerificationModal';
 import './OrderDetails.css';
 
 export default function OrderDetails({ orderId: propOrderId, onBack }) {
@@ -52,6 +53,7 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
   const [showQR, setShowQR] = useState(false);
   const [showDispute, setShowDispute] = useState(false);
   const [showItemVal, setShowItemVal] = useState(false);
+  const [showDeliverOtpModal, setShowDeliverOtpModal] = useState(false);
   const [showRePayGateway, setShowRePayGateway] = useState(false);
   const [showCustomerPayTotal, setShowCustomerPayTotal] = useState(false);
   const [newTxn, setNewTxn] = useState('');
@@ -307,6 +309,10 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
 
   const next = NEXT[order.status];
   const advance = async () => {
+    if (next === 'Delivered' && user?.role === 'agent') {
+      setShowDeliverOtpModal(true);
+      return;
+    }
     const isPrepaidUTR = order.itemPaid || order.paymentMethod === 'prepaid' || (Boolean(order.utrId) && order.paymentMethod !== 'cod');
     const isPaid = order.paymentStatus === 'paid' || order.paymentStatus === 'verified';
     if (next === 'Picked-up' && isPrepaidUTR && !isPaid) {
@@ -644,6 +650,67 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
           </div>
         )}
       </div>
+
+      {/* Customer Delivery OTP Card - ONLY visible to customer, NEVER to agent or admin */}
+      {order.deliveryOtp && (user?.role === 'user' || !user) && order.status !== 'Delivered' && order.status !== 'Cancelled' && (
+        <div
+          className="customer-delivery-otp-banner"
+          style={{
+            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+            border: '2px solid #3b82f6',
+            borderRadius: 14,
+            padding: '16px 20px',
+            margin: '18px 0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12,
+            boxShadow: '0 4px 14px rgba(59, 130, 246, 0.12)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div
+              style={{
+                fontSize: 30,
+                background: '#ffffff',
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                display: 'grid',
+                placeItems: 'center',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                border: '1px solid #bfdbfe',
+              }}
+            >
+              🔐
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Your Delivery OTP
+              </div>
+              <div style={{ fontSize: 13, color: '#2563eb', marginTop: 2 }}>
+                Share this 4-digit verification code with your delivery agent only when receiving your package.
+              </div>
+            </div>
+          </div>
+          <div
+            style={{
+              background: '#1e3a8a',
+              color: '#ffffff',
+              fontSize: 26,
+              fontWeight: 900,
+              letterSpacing: '0.25em',
+              padding: '8px 22px',
+              borderRadius: 10,
+              boxShadow: '0 2px 8px rgba(30, 58, 138, 0.25)',
+              fontFamily: 'monospace',
+            }}
+          >
+            {order.deliveryOtp}
+          </div>
+        </div>
+      )}
 
       {/* Main Grid Layout */}
       <div className="trk-grid">
@@ -1179,11 +1246,21 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
               <button
                 type="button"
                 className="trk-btn trk-btn-primary"
-                style={{ width: '100%', padding: '12px', fontSize: '0.95rem', justifyContent: 'center' }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  fontSize: '0.95rem',
+                  justifyContent: 'center',
+                  background: next === 'Delivered' ? 'linear-gradient(135deg, #16a34a, #15803d)' : undefined,
+                }}
                 disabled={busy}
                 onClick={advance}
               >
-                {busy ? 'Updating…' : `Advance Delivery: Mark as ${next}`}
+                {busy
+                  ? 'Updating…'
+                  : next === 'Delivered'
+                  ? '🔐 Deliver with Customer OTP'
+                  : `Advance Delivery: Mark as ${next}`}
               </button>
             </div>
           )}
@@ -1392,6 +1469,16 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
         isOpen={showReceiptModal}
         onClose={() => setShowReceiptModal(false)}
       />
+
+      {/* Delivery Verification (Cash Collection + Customer OTP) Modal for Agent */}
+      {showDeliverOtpModal && (
+        <DeliveryVerificationModal
+          order={order}
+          onClose={() => setShowDeliverOtpModal(false)}
+          onSuccess={reload}
+          toast={toast}
+        />
+      )}
     </div>
   );
 }

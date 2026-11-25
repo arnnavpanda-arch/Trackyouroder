@@ -14,6 +14,7 @@ import AddItemValueModal from '../../components/AddItemValueModal';
 import Modal from '../../components/Modal';
 import OrderDetails from '../OrderDetails';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import DeliveryVerificationModal from '../../components/DeliveryVerificationModal';
 
 export function AgentDeliveries() {
   const { user, toast, socket } = useApp();
@@ -24,6 +25,7 @@ export function AgentDeliveries() {
   const [disputingOrder, setDisputingOrder] = useState(null);
   const [itemValOrder, setItemValOrder] = useState(null);
   const [deletingOrder, setDeletingOrder] = useState(null);
+  const [deliveringOrder, setDeliveringOrder] = useState(null);
   const [busyDelete, setBusyDelete] = useState(false);
   const [activeGpsOrders, setActiveGpsOrders] = useState({});
   const [orderDistances, setOrderDistances] = useState({});
@@ -178,6 +180,10 @@ export function AgentDeliveries() {
 
   const quick = async (o) => {
     const nextStatus = NEXT[o.status];
+    if (nextStatus === 'Delivered') {
+      setDeliveringOrder(o);
+      return;
+    }
     const isPrepaidUTR = o.itemPaid || o.paymentMethod === 'prepaid' || (Boolean(o.utrId) && o.paymentMethod !== 'cod');
     const isPaid = o.paymentStatus === 'paid' || o.paymentStatus === 'verified';
     if (nextStatus === 'Picked-up' && isPrepaidUTR && !isPaid) {
@@ -567,14 +573,25 @@ export function AgentDeliveries() {
                     <button
                       className="btn sm"
                       disabled={busy === o.id || (NEXT[o.status] === 'Picked-up' && isPrepaidUTR && !isPaid)}
-                      onClick={() => quick(o)}
+                      style={
+                        NEXT[o.status] === 'Delivered'
+                          ? { background: 'linear-gradient(135deg, #16a34a, #15803d)', color: '#fff', fontWeight: 800 }
+                          : undefined
+                      }
+                      onClick={() => {
+                        if (NEXT[o.status] === 'Delivered') {
+                          setDeliveringOrder(o);
+                        } else {
+                          quick(o);
+                        }
+                      }}
                       title={
                         NEXT[o.status] === 'Picked-up' && isPrepaidUTR && !isPaid
                           ? (o.paymentStatus === 'not_verified' ? 'Customer must re-pay fee before pickup' : 'Verify pre-paid UTR first')
                           : ''
                       }
                     >
-                      {busy === o.id ? '…' : `Mark ${NEXT[o.status]}`}
+                      {busy === o.id ? '…' : NEXT[o.status] === 'Delivered' ? '🔐 Deliver with OTP' : `Mark ${NEXT[o.status]}`}
                     </button>
                   )}
                 </div>
@@ -711,6 +728,16 @@ export function AgentDeliveries() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Delivery Verification (Cash Collection + Customer OTP) Modal */}
+      {deliveringOrder && (
+        <DeliveryVerificationModal
+          order={deliveringOrder}
+          onClose={() => setDeliveringOrder(null)}
+          onSuccess={reload}
+          toast={toast}
+        />
       )}
     </>
   );

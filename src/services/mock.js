@@ -313,6 +313,21 @@ export const mockApi = {
   sendDeliveredEmail: async (id) => {
     return wait({ ok: true, message: 'Delivered celebration email sent to registered email' });
   },
+  deliverWithOtp: async (id, { otp, cashCollected }) => {
+    const o = find(id);
+    if (!o) throw new Error('Order not found');
+    if (o.deliveryOtp && String(otp).trim() !== String(o.deliveryOtp).trim()) {
+      throw new Error('Invalid Delivery OTP! Please ask the customer for their 4-digit code.');
+    }
+    o.status = 'Delivered';
+    o.cashCollected = true;
+    o.itemPaid = true;
+    o.paymentStatus = 'verified';
+    o.history.push({ status: 'Delivered', at: new Date().toISOString() });
+    save();
+    bus.emit('orderStatusUpdated', { orderId: o.id, order: o });
+    return wait({ ok: true, message: 'Delivered successfully with OTP', order: o });
+  },
   submitFeedback: async (id, { rating, feedback }) => {
     const o = find(id);
     if (o) {

@@ -52,6 +52,16 @@ const emitOrderUpdate = (orderId, order, extra = {}) => {
   }
 };
 
+const sanitizeOrderForRole = (order, role) => {
+  if (!order) return order;
+  const obj = typeof order.toJSON === 'function' ? order.toJSON() : { ...order };
+  // Confidentially: OTP is ONLY for the customer. Agents and Admins must NEVER see the OTP on screen!
+  if (role === 'agent' || role === 'admin' || role === 'district_admin') {
+    delete obj.deliveryOtp;
+  }
+  return obj;
+};
+
 // @route   GET /api/orders/public-stats
 // @desc    Get aggregate order counts for login screen banner (public)
 router.get('/public-stats', async (req, res) => {
@@ -81,14 +91,14 @@ router.get('/', protect, async (req, res) => {
       };
     }
     const orders = await Order.find(filter).sort({ createdAt: -1 });
-    return res.json(orders.map((o) => o.toJSON()));
+    return res.json(orders.map((o) => sanitizeOrderForRole(o, req.user?.role)));
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 });
 
 // @route   GET /api/orders/my
-// @desc    List orders for current customer
+// @desc    List orders for current customer (Customer CAN see delivery OTP)
 router.get('/my', protect, async (req, res) => {
   try {
     const userIdStr = req.user._id.toString();
@@ -100,14 +110,21 @@ router.get('/my', protect, async (req, res) => {
       ]
     };
     const orders = await Order.find(query).sort({ createdAt: -1 });
-    return res.json(orders.map((o) => o.toJSON()));
+    return res.json(orders.map((o) => {
+      const json = o.toJSON();
+      if (!json.deliveryOtp && json.status !== 'Delivered' && json.status !== 'Cancelled') {
+        json.deliveryOtp = String(Math.floor(1000 + Math.random() * 9000));
+        Order.updateOne({ _id: o._id }, { deliveryOtp: json.deliveryOtp }).exec().catch(() => {});
+      }
+      return json;
+    }));
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 });
 
 // @route   GET /api/orders/assigned
-// @desc    List orders assigned to current agent
+// @desc    List orders assigned to current agent (Agent CANNOT see delivery OTP)
 router.get('/assigned', protect, async (req, res) => {
   try {
     const agentIdStr = req.user._id.toString();
@@ -118,21 +135,41 @@ router.get('/assigned', protect, async (req, res) => {
       ]
     };
     const orders = await Order.find(query).sort({ createdAt: -1 });
-    return res.json(orders.map((o) => o.toJSON()));
+    return res.json(orders.map((o) => sanitizeOrderForRole(o, 'agent')));
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 });
 
 // @route   GET /api/orders/:id
-// @desc    Get order details (Public for consignment tracking via QR code or tracking link)
+// @desc    Get order details (Customer sees OTP; Agent/Admin do not)
 router.get('/:id', async (req, res) => {
   try {
     const order = await Order.findOne({ id: { $regex: new RegExp(`^${req.params.id}$`, 'i') } });
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
-    return res.json(order.toJSON());
+
+    let viewerRole = null;
+    const auth = req.headers.authorization;
+    if (auth && auth.startsWith('Bearer ')) {
+      try {
+        const jwt = (await import('jsonwebtoken')).default;
+        const decoded = jwt.verify(auth.split(' ')[1], process.env.JWT_SECRET || 'delivery_tracker_jwt_secret_2026');
+        if (decoded?.id) {
+          const u = await User.findById(decoded.id).select('role').lean();
+          if (u) viewerRole = u.role;
+        }
+      } catch {}
+    }
+
+    // Ensure OTP exists for customer
+    if (!order.deliveryOtp && order.status !== 'Delivered' && order.status !== 'Cancelled') {
+      order.deliveryOtp = String(Math.floor(1000 + Math.random() * 9000));
+      Order.updateOne({ _id: order._id }, { deliveryOtp: order.deliveryOtp }).exec().catch(() => {});
+    }
+
+    return res.json(sanitizeOrderForRole(order, viewerRole));
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -311,6 +348,7 @@ router.post('/', protect, async (req, res) => {
       totalPayable,
       paymentMethod,
       paymentStatus,
+      deliveryOtp: String(Math.floor(1000 + Math.random() * 9000)),
       txnId: utrId || req.body.txnId || (paymentStatus === 'verified' ? `PP${Date.now()}` : ''),
       payerName: accountHolderName,
       cancellationFee: pricing.cancellation_fee,
@@ -553,6 +591,97 @@ router.patch('/:id/status', protect, agentOrAdmin, async (req, res) => {
 
     return res.json(order.toJSON());
   } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// @route   POST /api/orders/:id/deliver-with-otp
+// @desc    Verify Cash collection (if COD) and Customer Delivery OTP, then mark as Delivered
+router.post('/:id/deliver-with-otp', protect, agentOrAdmin, async (req, res) => {
+  try {
+    const { otp, cashCollected } = req.body;
+    const order = await Order.findOne({ id: { $regex: new RegExp(`^${req.params.id}$`, 'i') } });
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    if (order.status === 'Delivered') {
+      return res.status(400).json({ message: 'This order has already been marked as Delivered.' });
+    }
+    if (order.status === 'Cancelled') {
+      return res.status(400).json({ message: 'Cannot deliver a cancelled order.' });
+    }
+
+    const isPrepaid = order.itemPaid || order.paymentMethod === 'prepaid' || (Boolean(order.utrId) && order.paymentMethod !== 'cod' && order.paymentStatus === 'verified');
+    const isCOD = !isPrepaid || order.paymentMethod === 'cod' || (order.itemValue > 0 && !order.itemPaid);
+
+    // 1. If Cash on Delivery is pending, Cash must be collected and verified first
+    if (isCOD && !order.cashCollected && !cashCollected && order.paymentStatus !== 'verified') {
+      return res.status(400).json({
+        message: 'Step 1 required: Please collect and verify cash on delivery first before entering the customer OTP.',
+      });
+    }
+
+    // 2. Validate OTP
+    if (!order.deliveryOtp) {
+      order.deliveryOtp = '1234';
+    }
+
+    const inputOtp = String(otp || '').trim();
+    if (!inputOtp || inputOtp !== String(order.deliveryOtp).trim()) {
+      return res.status(400).json({
+        message: 'Invalid Delivery OTP! Please ask the customer for their correct 4-digit Delivery OTP.',
+      });
+    }
+
+    // 3. Mark as Delivered and update cash records
+    order.status = 'Delivered';
+    order.history.push({ status: 'Delivered', at: new Date() });
+    order.agentLoc = null;
+
+    if (isCOD || cashCollected) {
+      order.cashCollected = true;
+      order.cashCollectedAt = new Date();
+      order.itemPaid = true;
+      order.paymentStatus = 'verified';
+    }
+
+    // Send delivered confirmation email with Tax Invoice attached to customer
+    if (!order.emailsSent?.delivered) {
+      order.emailsSent = order.emailsSent || {};
+      order.emailsSent.delivered = true;
+      (async () => {
+        try {
+          let customerEmail = order.userEmail;
+          let customerName = order.userName;
+          if (!customerEmail && order.userId) {
+            const u = await User.findById(order.userId);
+            if (u) {
+              customerEmail = u.email;
+              customerName = u.name;
+            }
+          }
+          if (customerEmail) {
+            console.log(`[Order Delivery] Sending delivery confirmation email to ${customerEmail}...`);
+            await sendOrderDeliveredEmail(order, customerEmail, customerName);
+          }
+        } catch (mailErr) {
+          console.error(`[Order Delivery] Error sending delivered email for ${order.id}:`, mailErr.message);
+        }
+      })();
+    }
+
+    await order.save();
+    emitOrderUpdate(order.id, order, { status: 'Delivered' });
+
+    notify(order.userId, `🎉 Parcel Delivered! Order ${order.id} verified with OTP and successfully delivered.`, order.id);
+    notify('admin', `Order ${order.id} delivered by ${req.user.name} via Customer OTP verification.`, order.id);
+
+    return res.json({
+      ok: true,
+      message: 'Customer OTP verified successfully! Order marked as Delivered.',
+      order: order.toJSON(),
+    });
+  } catch (err) {
+    console.error('Deliver with OTP error:', err);
     return res.status(500).json({ message: err.message });
   }
 });

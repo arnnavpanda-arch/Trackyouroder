@@ -61,6 +61,7 @@ const real = {
   resolveLocation: (input) => http.post('/orders/resolve-location', { input }).then(d),
   sendInvoiceEmail: (id) => http.post(`/orders/${id}/send-invoice`).then(d),
   sendDeliveredEmail: (id) => http.post(`/orders/${id}/send-delivered-email`).then(d),
+  deliverWithOtp: (id, b) => http.post(`/orders/${id}/deliver-with-otp`, b).then(d),
   submitFeedback: (id, b) => http.post(`/orders/${id}/feedback`, b).then(d),
   getSettings: () => http.get('/settings').then(d),
   saveSettings: (s) => http.post('/settings', s).then(d),
