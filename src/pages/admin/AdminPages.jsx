@@ -27,6 +27,7 @@ export function AdminDashboard() {
   const [simDist, setSimDist] = useState(8);
   const [offer, setOffer] = useState(() => (pricing?.delivery_offer ? { ...DEFAULT_OFFER, ...pricing.delivery_offer } : DEFAULT_OFFER));
   const [savingOffer, setSavingOffer] = useState(false);
+  const [approvingAgentId, setApprovingAgentId] = useState(null);
 
   useEffect(() => {
     if (settings?.logo_url) {
@@ -223,7 +224,6 @@ export function AdminDashboard() {
   const perDay = series(orders, from, to);
   const pie = STATUSES.map((x) => ({ name: x, value: orders.filter((o) => o.status === x).length }));
   const agents = users.filter((u) => u.role === 'agent').map((a) => ({ name: a.name.split(' ')[0], delivered: orders.filter((o) => o.agentId === a.id && o.status === 'Delivered').length }));
-  const [approvingAgentId, setApprovingAgentId] = useState(null);
   const pendingAgents = (users || []).filter((u) => u.role === 'agent' && (u.isApproved === false || u.approvalStatus === 'pending'));
 
   const handleApproveAgent = async (ag, approved) => {

@@ -248,8 +248,6 @@ function AuthFlow({ initialAction = 'signin' }) {
   const [errs, setErrs] = useState({});
   const [busy, setBusy] = useState(false);
 
-  if (user) return <Navigate to={homeFor(user.role)} replace />;
-
   const set = (k) => (e) => setV((prev) => ({ ...prev, [k]: e.target.value }));
   const [logoUrl, setLogoUrl] = useState(() => {
     try {
@@ -268,6 +266,8 @@ function AuthFlow({ initialAction = 'signin' }) {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
+
+  if (user) return <Navigate to={homeFor(user.role)} replace />;
 
   const activeLogo = settings?.logo_url || logoUrl;
   const currentRole = ROLES.find((r) => r.id === selectedRole) || ROLES[0];
