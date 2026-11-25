@@ -1,19 +1,26 @@
 import express from 'express';
 import { User } from '../models/User.js';
-import { protect, adminOnly } from '../middleware/auth.js';
+import { protect, adminOrDistrictAdmin, adminOnly } from '../middleware/auth.js';
 import { getIO } from '../socket.js';
 import { sendAgentApprovedEmail, sendAgentRejectedEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
-// All user management routes require admin role
-router.use(protect, adminOnly);
+// Allow Admin and District Admin access
+router.use(protect, adminOrDistrictAdmin);
 
 // @route   GET /api/users
-// @desc    List all users
+// @desc    List all users (filtered by district if district_admin)
 router.get('/', async (req, res) => {
   try {
-    const users = await User.find().sort({ createdAt: -1 });
+    let filter = {};
+    if (req.user.role === 'district_admin' && req.user.district) {
+      filter = {
+        district: req.user.district,
+        role: { $in: ['agent', 'user'] }
+      };
+    }
+    const users = await User.find(filter).sort({ createdAt: -1 });
     return res.json(users.map((u) => u.toJSON()));
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -21,9 +28,9 @@ router.get('/', async (req, res) => {
 });
 
 // @route   POST /api/users
-// @desc    Create a new user
+// @desc    Create a new user / agent / district_admin
 router.post('/', async (req, res) => {
-  const { name, email, password, role, phone, active } = req.body;
+  const { name, email, password, role, phone, active, state, district, displayPassword } = req.body;
 
   try {
     const exists = await User.findOne({ email: email.toLowerCase() });
@@ -35,8 +42,11 @@ router.post('/', async (req, res) => {
       name,
       email: email.toLowerCase(),
       password: password || 'user123',
+      displayPassword: displayPassword || password || '',
       role: role || 'user',
       phone: phone || '',
+      state: state || '',
+      district: district || '',
       active: active !== undefined ? active : true,
     });
 
@@ -49,7 +59,7 @@ router.post('/', async (req, res) => {
 // @route   PUT /api/users/:id
 // @desc    Update user
 router.put('/:id', async (req, res) => {
-  const { name, email, role, phone, active, password } = req.body;
+  const { name, email, role, phone, active, password, state, district, displayPassword } = req.body;
 
   try {
     const user = await User.findById(req.params.id);
@@ -69,7 +79,13 @@ router.put('/:id', async (req, res) => {
     if (role) user.role = role;
     if (phone !== undefined) user.phone = phone;
     if (active !== undefined) user.active = active;
-    if (password) user.password = password;
+    if (state !== undefined) user.state = state;
+    if (district !== undefined) user.district = district;
+    if (displayPassword !== undefined) user.displayPassword = displayPassword;
+    if (password) {
+      user.password = password;
+      if (!displayPassword) user.displayPassword = password;
+    }
 
     await user.save();
     return res.json(user.toJSON());
@@ -139,6 +155,12 @@ router.patch('/:id/approval', async (req, res) => {
 
     if (user.role !== 'agent') {
       return res.status(400).json({ message: 'Only delivery agent accounts require administrative approval' });
+    }
+
+    if (req.user.role === 'district_admin' && req.user.district) {
+      if ((user.district || '').trim().toLowerCase() !== req.user.district.trim().toLowerCase()) {
+        return res.status(403).json({ message: `Access denied: You can only review agents registered in ${req.user.district}` });
+      }
     }
 
     user.isApproved = Boolean(approved);

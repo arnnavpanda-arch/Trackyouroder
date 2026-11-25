@@ -294,7 +294,15 @@ export function PlaceOrder() {
   const [pickupState, setPickupState] = useState(user?.state || 'Odisha');
   const [pickupDistrict, setPickupDistrict] = useState(user?.district || 'Khordha (Bhubaneswar)');
   const [dropState, setDropState] = useState(user?.state || 'Odisha');
-  const [dropDistrict, setDropDistrict] = useState('');
+  const [dropDistrict, setDropDistrict] = useState(user?.district || 'Khordha (Bhubaneswar)');
+
+  const handlePickupDistrictChange = (nextDistrict) => {
+    setPickupDistrict(nextDistrict);
+    setDropDistrict(nextDistrict); // Strictly locked: orders must travel in the same district only
+    if (errs.pickupDistrict || errs.dropDistrict) {
+      setErrs((prev) => ({ ...prev, pickupDistrict: '', dropDistrict: '' }));
+    }
+  };
 
   const calculatedDistanceKm = useMemo(() => {
     if (pickupCoords?.lat != null && dropCoords?.lat != null) {
@@ -308,14 +316,6 @@ export function PlaceOrder() {
     return getDeliveryFeeDetails(v.weight, pricing, v.itemValue, calculatedDistanceKm);
   }, [v.weight, pricing, v.itemValue, calculatedDistanceKm]);
   const currentFee = feeDetails.fee;
-  const weightNum = Number(v.weight) || 0;
-  const currentTier = weightNum <= 1 ? 'under_1kg' : weightNum <= 5 ? '1kg_to_5kg' : 'above_5kg';
-
-  const selectTier = (t) => {
-    if (t === 'under_1kg') setV((prev) => ({ ...prev, weight: '0.8' }));
-    else if (t === '1kg_to_5kg') setV((prev) => ({ ...prev, weight: '2.5' }));
-    else setV((prev) => ({ ...prev, weight: '6.0' }));
-  };
 
   const handlePickupStateChange = (nextState) => {
     setPickupState(nextState);
@@ -349,6 +349,10 @@ export function PlaceOrder() {
     // Strict intra-state delivery rule
     if (pickupState.trim().toLowerCase() !== dropState.trim().toLowerCase()) {
       errors.dropState = `Orders must travel in the same state only (${pickupState}). Delivery to another state is strictly prohibited.`;
+    }
+    // Strict same-district delivery rule
+    if (pickupDistrict && dropDistrict && pickupDistrict.trim().toLowerCase() !== dropDistrict.trim().toLowerCase()) {
+      errors.dropDistrict = `Orders must travel within the same district only (${pickupDistrict}). Cross-district delivery is strictly prohibited.`;
     }
     const w = Number(v.weight);
     if (!w || w <= 0 || w > 50) {
@@ -667,10 +671,7 @@ export function PlaceOrder() {
               <Field label="Pickup District" error={errs.pickupDistrict}>
                 <select
                   value={pickupDistrict}
-                  onChange={(e) => {
-                    setPickupDistrict(e.target.value);
-                    if (errs.pickupDistrict) setErrs((prev) => ({ ...prev, pickupDistrict: '' }));
-                  }}
+                  onChange={(e) => handlePickupDistrictChange(e.target.value)}
                   disabled={!pickupState}
                   style={{
                     padding: '9px 12px',
@@ -745,7 +746,7 @@ export function PlaceOrder() {
                 <span>🏠</span> Delivery Drop Destination
               </h4>
               <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 8, border: '1px solid #fde68a' }}>
-                🔒 Intra-State Only
+                🔒 Same District Only
               </span>
             </div>
 
@@ -771,33 +772,25 @@ export function PlaceOrder() {
                 </div>
               </Field>
 
-              <Field label="Drop District" error={errs.dropDistrict}>
-                <select
-                  value={dropDistrict}
-                  onChange={(e) => {
-                    setDropDistrict(e.target.value);
-                    if (errs.dropDistrict) setErrs((prev) => ({ ...prev, dropDistrict: '' }));
-                  }}
-                  disabled={!pickupState}
-                  style={{
-                    padding: '9px 12px',
-                    borderRadius: 8,
-                    border: '1.5px solid #cbd5e1',
-                    fontSize: '0.88rem',
-                    background: !pickupState ? '#f1f5f9' : '#ffffff',
-                    width: '100%',
-                  }}
-                >
-                  <option value="">{pickupState ? `-- Select Drop District in ${pickupState} --` : '-- Set Pickup State first --'}</option>
-                  {(pickupState && INDIA_STATES_DATA[pickupState] ? INDIA_STATES_DATA[pickupState] : []).map((dist) => {
-                    const isDistOk = isRegionEligible(pickupState, dist, settings?.serviceable_regions);
-                    return (
-                      <option key={dist} value={dist}>
-                        {dist} {isDistOk ? '' : '(Pending Approval)'}
-                      </option>
-                    );
-                  })}
-                </select>
+              <Field label="Drop District (Same District Locked)" error={errs.dropDistrict}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={pickupDistrict ? `${pickupDistrict} 🔒 (Same District Only)` : '-- Select Pickup District first --'}
+                    disabled
+                    readOnly
+                    style={{
+                      padding: '9px 12px',
+                      borderRadius: 8,
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '0.88rem',
+                      background: '#f1f5f9',
+                      color: '#334155',
+                      fontWeight: 700,
+                      width: '100%',
+                    }}
+                  />
+                </div>
               </Field>
             </div>
 
@@ -912,10 +905,14 @@ export function PlaceOrder() {
               <span style={{ fontSize: 11, color: '#64748b', marginLeft: 4 }}>(₹{feeDetails.extraPerKm}/km)</span>
             </div>
 
-            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-              <small style={{ color: '#64748b', fontSize: 11.5, display: 'block' }}>⚖️ Package Weight</small>
-              <b style={{ fontSize: 16, color: '#0f172a' }}>{v.weight} kg</b>
-              {feeDetails.weightSurcharge > 0 && <span style={{ fontSize: 11, color: '#dc2626', marginLeft: 4 }}>+₹{feeDetails.weightSurcharge}</span>}
+            <div style={{ background: '#f0fdf4', padding: '10px 14px', borderRadius: 10, border: '1px solid #bbf7d0' }}>
+              <small style={{ color: '#166534', fontSize: 11.5, display: 'block' }}>🏢 Delivery Scope</small>
+              <b style={{ fontSize: 15, color: '#15803d' }}>
+                Same District Delivery
+              </b>
+              <span style={{ fontSize: 11, color: '#64748b', display: 'block', marginTop: 2 }}>
+                {pickupDistrict ? `Within ${pickupDistrict}` : 'Select district'}
+              </span>
             </div>
           </div>
 
@@ -931,36 +928,11 @@ export function PlaceOrder() {
               <span><b>Exceeds Distance Boundary:</b> Destination ({calculatedDistanceKm} km) exceeds the base {feeDetails.baseDistanceKm} km boundary by {feeDetails.extraKm} km. Extra distance charge of ₹{feeDetails.extraDistCharge} applied at ₹{feeDetails.extraPerKm}/km.</span>
             </div>
           )}
-        </div>
 
-        {/* Weight Tier Selection (Admin configured rates) */}
-        <div className="field">
-          <span>Select Weight Bracket & Rates (Admin Configured)</span>
-          <div className="weight-tier-pills">
-            <button
-              type="button"
-              className={`weight-pill ${currentTier === 'under_1kg' ? 'active' : ''}`}
-              onClick={() => selectTier('under_1kg')}
-            >
-              <span className="tier-tag">Under 1 kg</span>
-              <span className="tier-price">₹{pricing.under_1kg}</span>
-            </button>
-            <button
-              type="button"
-              className={`weight-pill ${currentTier === '1kg_to_5kg' ? 'active' : ''}`}
-              onClick={() => selectTier('1kg_to_5kg')}
-            >
-              <span className="tier-tag">1 kg to 5 kg</span>
-              <span className="tier-price">₹{pricing.tier_1_to_5kg}</span>
-            </button>
-            <button
-              type="button"
-              className={`weight-pill ${currentTier === 'above_5kg' ? 'active' : ''}`}
-              onClick={() => selectTier('above_5kg')}
-            >
-              <span className="tier-tag">5 kg+</span>
-              <span className="tier-price">₹{pricing.tier_above_5kg}</span>
-            </button>
+          {/* Same-District Status Banner */}
+          <div style={{ marginTop: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, color: '#166534', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>🟢</span>
+            <span><b>Same-District Delivery Only:</b> Pickup and drop are restricted to <b>{pickupDistrict || 'the selected district'}</b> for fast local courier transit.</span>
           </div>
         </div>
 

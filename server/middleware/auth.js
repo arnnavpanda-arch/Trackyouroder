@@ -57,8 +57,15 @@ export const adminOnly = (req, res, next) => {
   return res.status(403).json({ message: 'Access denied: Admin role required' });
 };
 
+export const adminOrDistrictAdmin = (req, res, next) => {
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'district_admin')) {
+    return next();
+  }
+  return res.status(403).json({ message: 'Access denied: Administrator or District Admin role required' });
+};
+
 export const agentOrAdmin = (req, res, next) => {
-  if (req.user && (req.user.role === 'agent' || req.user.role === 'admin')) {
+  if (req.user && (req.user.role === 'agent' || req.user.role === 'admin' || req.user.role === 'district_admin')) {
     return next();
   }
   return res.status(403).json({ message: 'Access denied: Agent or Admin role required' });

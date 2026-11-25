@@ -9,7 +9,21 @@ export default function AssignAgentModal({ order, onClose, onDone }) {
   const [agents, setAgents] = useState(null);
   const [sel, setSel] = useState(order.agentId || '');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { api.listUsers().then((u) => setAgents(u.filter((x) => x.role === 'agent' && x.active))).catch((e) => toast(e.message, 'error')); }, [toast]);
+
+  useEffect(() => {
+    api.listUsers().then((u) => {
+      let filtered = u.filter((x) => x.role === 'agent' && x.active && x.isApproved !== false && x.approvalStatus !== 'rejected');
+      const targetDistrict = order.pickup?.district || order.drop?.district;
+      if (targetDistrict) {
+        const inDistrict = filtered.filter((x) => x.district && x.district.toLowerCase() === targetDistrict.toLowerCase());
+        if (inDistrict.length > 0) {
+          filtered = inDistrict;
+        }
+      }
+      setAgents(filtered);
+    }).catch((e) => toast(e.message, 'error'));
+  }, [toast, order]);
+
   const submit = async () => {
     setBusy(true);
     try { await api.assignAgent(order.id, sel); toast(`Agent assigned to ${order.id}`, 'success'); onDone(); onClose(); }

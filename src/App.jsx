@@ -33,7 +33,8 @@ function Guard({ role, children }) {
   const { user, booting } = useApp();
   if (booting) return <Spinner full />;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== role) return <Navigate to={homeFor(user.role)} replace />;
+  const allowed = Array.isArray(role) ? role.includes(user.role) : user.role === role;
+  if (!allowed) return <Navigate to={homeFor(user.role)} replace />;
   return children;
 }
 function Root() {
@@ -76,6 +77,13 @@ export default function App() {
             <Route path="live" element={<LiveMonitor />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<SystemSettings />} />
+          </Route>
+          <Route path="/district-admin" element={<Guard role="district_admin"><Layout /></Guard>}>
+            <Route index element={<Navigate to="/district-admin/orders" replace />} />
+            <Route path="orders" element={<ManageOrders districtOnly={true} />} />
+            <Route path="orders/:id" element={<OrderDetails />} />
+            <Route path="agents" element={<ManageUsers districtOnly={true} />} />
+            <Route path="live" element={<LiveMonitor districtOnly={true} />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

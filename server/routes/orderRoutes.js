@@ -67,10 +67,20 @@ router.get('/public-stats', async (req, res) => {
 });
 
 // @route   GET /api/orders
-// @desc    List all orders (Admin or all logged in users)
+// @desc    List all orders (Admin, District Admin, or logged in users)
 router.get('/', protect, async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 });
+    let filter = {};
+    if (req.user.role === 'district_admin' && req.user.district) {
+      filter = {
+        $or: [
+          { 'pickup.district': req.user.district },
+          { 'drop.district': req.user.district },
+          { district: req.user.district }
+        ]
+      };
+    }
+    const orders = await Order.find(filter).sort({ createdAt: -1 });
     return res.json(orders.map((o) => o.toJSON()));
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -160,7 +170,14 @@ router.post('/', protect, async (req, res) => {
       });
     }
 
-    // 3. Minimum distance boundary and per-km pricing
+    // 2. Intra-district rule: Strictly same district delivery only
+    if (pickupDistrict && dropDistrict && pickupDistrict.trim().toLowerCase() !== dropDistrict.trim().toLowerCase()) {
+      return res.status(400).json({
+        message: `Cross-district delivery is not permitted. Parcels can only be delivered within the same district (${pickupDistrict}).`
+      });
+    }
+
+    // 3. Minimum distance boundary and per-km pricing (strictly distance-based delivery pricing)
     const baseDist = Number(pricing.base_distance_km) || 5;
     const minFee = Number(pricing.min_distance_fee) || Number(pricing.under_1kg) || 50;
     const perKm = Number(pricing.extra_per_km) || 12;
@@ -172,13 +189,7 @@ router.post('/', protect, async (req, res) => {
     }
 
     const weight = Number(req.body.weight) || 1;
-    let weightSurcharge = 0;
-    if (weight > 5) {
-      weightSurcharge = (Number(pricing.tier_above_5kg) || 150) - (Number(pricing.under_1kg) || 40);
-    } else if (weight > 1) {
-      weightSurcharge = (Number(pricing.tier_1_to_5kg) || 80) - (Number(pricing.under_1kg) || 40);
-    }
-    const baseFee = distFee + Math.max(0, weightSurcharge);
+    const baseFee = distFee;
 
     const itemValue = req.body.itemValue ? Number(req.body.itemValue) : null;
     let fee = baseFee;
@@ -655,6 +666,16 @@ router.patch('/:id/assign', protect, async (req, res) => {
 
     const agent = await User.findById(agentId);
     if (!agent) return res.status(404).json({ message: 'Agent not found' });
+
+    if (req.user.role === 'district_admin' && req.user.district) {
+      const orderDist = (order.drop?.district || order.pickup?.district || '').trim().toLowerCase();
+      if (orderDist && orderDist !== req.user.district.trim().toLowerCase()) {
+        return res.status(403).json({ message: `Access denied: You can only assign orders in ${req.user.district}` });
+      }
+      if (agent.district && agent.district.trim().toLowerCase() !== req.user.district.trim().toLowerCase()) {
+        return res.status(403).json({ message: `Access denied: Delivery agent must be from ${req.user.district}` });
+      }
+    }
 
     order.agentId = agent._id.toString();
     order.agentName = agent.name;

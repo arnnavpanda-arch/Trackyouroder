@@ -216,6 +216,14 @@ const ROLES = [
     desc: 'Fleet telemetry, operations control & user management',
     demoEmail: 'admin@demo.com',
     demoPassword: 'admin123',
+  },
+  {
+    id: 'district_admin',
+    label: 'District Admin',
+    icon: '🏛️',
+    desc: 'Local district dispatch, agent approval & live monitoring',
+    demoEmail: 'districtadmin@demo.com',
+    demoPassword: 'districtadmin123',
   }
 ];
 
@@ -455,7 +463,7 @@ function AuthFlow({ initialAction = 'signin' }) {
             </p>
 
             <div className="auth-role-cards">
-              {ROLES.filter((r) => action === 'signin' || r.id !== 'admin').map((r) => (
+              {ROLES.filter((r) => action === 'signin' ? true : (r.id !== 'admin' && r.id !== 'district_admin')).map((r) => (
                 <button
                   key={r.id}
                   type="button"

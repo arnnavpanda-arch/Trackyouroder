@@ -15,6 +15,11 @@ const NAV = {
     ['/admin/reports', 'Reports', 'chart'],
     ['/admin/settings', 'System Settings', 'settings'],
   ],
+  district_admin: [
+    ['/district-admin/orders', 'Manage Orders', 'box'],
+    ['/district-admin/agents', 'Agent Approvals', 'users'],
+    ['/district-admin/live', 'Live Monitoring', 'map'],
+  ],
 };
 
 export default function Sidebar({ open, onClose }) {
@@ -34,10 +39,10 @@ export default function Sidebar({ open, onClose }) {
           ) : (
             <span className="logo">T</span>
           )}
-          <div><b>{settings?.company_name ? settings.company_name.split(' ')[0] : 'Trackora'}</b><small>{user.role} console</small></div>
+          <div><b>{settings?.company_name ? settings.company_name.split(' ')[0] : 'Trackora'}</b><small>{user?.role === 'district_admin' ? (user?.district ? `${user.district} Admin` : 'District Admin') : `${user?.role || 'user'} console`}</small></div>
         </div>
         <nav>
-          {NAV[user.role].map(([to, label, icon], i) => (
+          {(NAV[user?.role] || []).map(([to, label, icon], i) => (
             <NavLink
               key={to}
               to={to}

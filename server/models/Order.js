@@ -102,6 +102,14 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    isOtherDistrict: {
+      type: Boolean,
+      default: false,
+    },
+    interDistrictFee: {
+      type: Number,
+      default: 0,
+    },
     offerApplied: {
       type: String,
       default: '',

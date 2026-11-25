@@ -4,7 +4,7 @@ export const MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 export const STATUSES = ['Placed', 'Picked-up', 'In-Transit', 'Delivered'];
 export const NEXT = { Placed: 'Picked-up', 'Picked-up': 'In-Transit', 'In-Transit': 'Delivered' };
 export const SLA_H = 8;
-export const homeFor = (role) => ({ user: '/user', agent: '/agent', admin: '/admin' }[role] || '/login');
+export const homeFor = (role) => ({ user: '/user', agent: '/agent', admin: '/admin', district_admin: '/district-admin/orders' }[role] || '/login');
 export const fmtDate = (d) => new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -112,7 +112,6 @@ export function evaluateDeliveryOffer(offer, itemValue = 0) {
 }
 
 export function calculateDeliveryFee(weight, pricing = getPricing(), itemValue = 0, distanceKm = null) {
-  const w = Number(weight) || 0;
   const d = distanceKm != null ? Math.max(0.5, Number(distanceKm)) : 3.5;
   const baseDist = Number(pricing?.base_distance_km) || 5;
   const minDistanceFee = Number(pricing?.min_distance_fee) || Number(pricing?.under_1kg) || 50;
@@ -123,14 +122,7 @@ export function calculateDeliveryFee(weight, pricing = getPricing(), itemValue =
     distFee = minDistanceFee + Math.ceil((d - baseDist) * extraPerKm);
   }
 
-  let weightSurcharge = 0;
-  if (w > 5) {
-    weightSurcharge = (Number(pricing?.tier_above_5kg) || 150) - (Number(pricing?.under_1kg) || 40);
-  } else if (w > 1) {
-    weightSurcharge = (Number(pricing?.tier_1_to_5kg) || 80) - (Number(pricing?.under_1kg) || 40);
-  }
-  const base = distFee + Math.max(0, weightSurcharge);
-
+  const base = distFee;
   const offer = pricing?.delivery_offer;
   const evalResult = evaluateDeliveryOffer(offer, itemValue);
 
@@ -141,7 +133,6 @@ export function calculateDeliveryFee(weight, pricing = getPricing(), itemValue =
 }
 
 export function getDeliveryFeeDetails(weight, pricing = getPricing(), itemValue = 0, distanceKm = null) {
-  const w = Number(weight) || 0;
   const d = distanceKm != null ? Math.max(0.5, Number(distanceKm)) : 3.5;
   const baseDist = Number(pricing?.base_distance_km) || 5;
   const minDistanceFee = Number(pricing?.min_distance_fee) || Number(pricing?.under_1kg) || 50;
@@ -154,14 +145,7 @@ export function getDeliveryFeeDetails(weight, pricing = getPricing(), itemValue 
     distFee = minDistanceFee + extraDistCharge;
   }
 
-  let weightSurcharge = 0;
-  if (w > 5) {
-    weightSurcharge = (Number(pricing?.tier_above_5kg) || 150) - (Number(pricing?.under_1kg) || 40);
-  } else if (w > 1) {
-    weightSurcharge = (Number(pricing?.tier_1_to_5kg) || 80) - (Number(pricing?.under_1kg) || 40);
-  }
-  const base = distFee + Math.max(0, weightSurcharge);
-
+  const base = distFee;
   const offer = pricing?.delivery_offer;
   const evalResult = evaluateDeliveryOffer(offer, itemValue);
 
@@ -174,7 +158,7 @@ export function getDeliveryFeeDetails(weight, pricing = getPricing(), itemValue 
     extraPerKm,
     extraKm,
     extraDistCharge,
-    weightSurcharge: Math.max(0, weightSurcharge),
+    weightSurcharge: 0,
     isFree: evalResult.eligible,
     offerActive: evalResult.active,
     offerApplied: evalResult.eligible ? evalResult.title : '',

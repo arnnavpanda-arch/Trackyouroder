@@ -258,7 +258,7 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
         label: `${order.userName || 'Customer'} (Drop 🏠)`,
         title: `Customer: ${order.userName || 'Delivery Destination'}`,
         address: order.drop.address || 'Drop Location',
-        phone: user?.role === 'admin' ? order.userPhone : null,
+        phone: (user?.role === 'admin' || user?.role === 'district_admin') ? order.userPhone : null,
         details: 'Delivery Destination (Drop Location)',
       });
     }
@@ -394,9 +394,9 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
     setBusy(false);
   };
 
-  const back = user?.role === 'admin' ? '/admin/orders' : user?.role === 'agent' ? '/agent' : '/user/orders';
+  const back = user?.role === 'admin' ? '/admin/orders' : user?.role === 'district_admin' ? '/district-admin/orders' : user?.role === 'agent' ? '/agent' : '/user/orders';
   const isAgent = user?.role === 'agent';
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'district_admin';
 
   const handleBack = () => {
     if (onBack) {
