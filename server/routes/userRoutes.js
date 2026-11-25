@@ -2,6 +2,7 @@ import express from 'express';
 import { User } from '../models/User.js';
 import { protect, adminOnly } from '../middleware/auth.js';
 import { getIO } from '../socket.js';
+import { sendAgentApprovedEmail, sendAgentRejectedEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
@@ -116,6 +117,62 @@ router.patch('/:id/toggle', async (req, res) => {
     user.active = !user.active;
     await user.save();
     return res.json(user.toJSON());
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// @route   PATCH /api/users/:id/approval
+// @desc    Approve or reject a delivery agent account (Admin only)
+router.patch('/:id/approval', async (req, res) => {
+  const { approved, remarks } = req.body;
+  try {
+    const isHex = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    const filter = isHex
+      ? { $or: [{ _id: req.params.id }, { id: req.params.id }] }
+      : { id: req.params.id };
+
+    const user = await User.findOne(filter);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.role !== 'agent') {
+      return res.status(400).json({ message: 'Only delivery agent accounts require administrative approval' });
+    }
+
+    user.isApproved = Boolean(approved);
+    user.approvalStatus = approved ? 'approved' : 'rejected';
+    user.approvalRemarks = remarks ? String(remarks).trim() : '';
+    if (approved) {
+      user.approvedAt = new Date();
+      user.active = true;
+    }
+    await user.save();
+
+    // Send email notification to agent (approved or rejected)
+    if (approved) {
+      sendAgentApprovedEmail(user).catch((e) => console.error('[Email Error] Agent approval mail failed:', e.message));
+    } else {
+      sendAgentRejectedEmail(user, remarks).catch((e) => console.error('[Email Error] Agent rejection mail failed:', e.message));
+    }
+
+    const io = getIO();
+    if (io) {
+      io.emit('userUpdated', user.toJSON());
+      io.emit('agentApprovalChanged', {
+        userId: user._id.toString(),
+        isApproved: user.isApproved,
+        approvalStatus: user.approvalStatus,
+        remarks: user.approvalRemarks,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      message: approved ? 'Agent account approved successfully' : 'Agent application rejected',
+      user: user.toJSON(),
+    });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }

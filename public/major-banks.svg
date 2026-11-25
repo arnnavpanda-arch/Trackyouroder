@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 32" width="130" height="32">
+  <!-- SBI Icon (State Bank of India) -->
+  <g transform="translate(4, 5)">
+    <circle cx="11" cy="11" r="11" fill="#0A529B"/>
+    <circle cx="11" cy="11" r="4.2" fill="#ffffff"/>
+    <rect x="9.5" y="11" width="3" height="11" fill="#ffffff"/>
+  </g>
+
+  <!-- HDFC Bank Icon -->
+  <g transform="translate(32, 5)">
+    <rect width="22" height="22" rx="3" fill="#004C8F"/>
+    <rect x="2" y="2" width="18" height="18" rx="2" fill="#ffffff"/>
+    <rect x="4.5" y="4.5" width="13" height="13" fill="#004C8F"/>
+    <rect x="8.5" y="2" width="5" height="18" fill="#ED232A"/>
+    <rect x="2" y="8.5" width="18" height="5" fill="#ED232A"/>
+    <rect x="8.5" y="8.5" width="5" height="5" fill="#ffffff"/>
+  </g>
+
+  <!-- ICICI Bank Icon -->
+  <g transform="translate(60, 5)">
+    <rect width="22" height="22" rx="3" fill="#A9211B"/>
+    <circle cx="11" cy="7" r="2.5" fill="#F58220"/>
+    <path d="M7 11h8l-4 8z" fill="#F58220"/>
+  </g>
+
+  <!-- Badge text "+ All Banks" -->
+  <text x="88" y="17" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8.5" font-weight="800" fill="#1e293b">
+    + ALL
+  </text>
+  <text x="88" y="25" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7.5" font-weight="700" fill="#64748b">
+    BANKS
+  </text>
+</svg>

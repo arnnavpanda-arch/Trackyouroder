@@ -11,7 +11,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import PaymentGatewayModal from '../../components/PaymentGatewayModal';
 import ShipmentReceiptModal from '../../components/ShipmentReceiptModal';
 import { Empty, ErrorBox, Field, Icon, PageHead, Spinner, StatCard, Tilt } from '../../components/UI';
-import { STATUSES, fmtDate, rules, validate, deliveredAt, getPricing, calculateDeliveryFee, getDeliveryFeeDetails, evaluateDeliveryOffer } from '../../utils/helpers';
+import { STATUSES, fmtDate, rules, validate, deliveredAt, getPricing, calculateDeliveryFee, getDeliveryFeeDetails, evaluateDeliveryOffer, encodeOrderSlug } from '../../utils/helpers';
 import OfferBanner from '../../components/OfferBanner';
 import { getResilientDeviceLocation, reverseGeocodeCoords, parseMapLinkOrAddress } from '../../utils/geoHelper';
 import { ALL_INDIAN_STATES, INDIA_STATES_DATA, isRegionEligible } from '../../utils/indiaGeoData';
@@ -53,7 +53,7 @@ const cols = [
   { key: 'go', header: '', render: (o) => (
     <Link
       className="link"
-      to={`/user/orders/${o.id}`}
+      to={`/user/orders/${encodeOrderSlug(o.id)}`}
       onClick={() => sessionStorage.setItem('dt_user_active_order', o.id)}
     >
       Track
@@ -85,7 +85,7 @@ export function UserDashboard() {
             <div
               onClick={() => {
                 sessionStorage.setItem('dt_user_active_order', o.id);
-                nav(`/user/orders/${o.id}`);
+                nav(`/user/orders/${encodeOrderSlug(o.id)}`);
               }}
               style={{ cursor: 'pointer' }}
             >

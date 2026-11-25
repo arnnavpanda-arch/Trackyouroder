@@ -890,3 +890,259 @@ Support: ${settings?.support_email || 'trackoradelivery@gmail.com'}
   }
 }
 
+/**
+ * Generate animated, celebratory Agent Approved HTML email
+ */
+export function generateAgentApprovedHtml(agent, settings) {
+  const companyName = settings?.company_name || 'Trackora Logistics Services Pvt. Ltd.';
+  const logoUrl = settings?.logo_url || '';
+  const supportEmail = settings?.support_email || 'trackoradelivery@gmail.com';
+  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5001';
+  const loginUrl = `${clientOrigin}/login`;
+  const vehicle = agent?.agentDetails?.vehicleType || 'Courier Vehicle';
+  const location = [agent?.district, agent?.state].filter(Boolean).join(', ') || 'Assigned Territory';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Account Approved - ${companyName}</title>
+  <style>
+    body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; }
+    .email-container { max-width: 600px; margin: 24px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+    .header-bar { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 32px 24px; text-align: center; color: #ffffff; }
+    .brand-logo { max-height: 48px; max-width: 180px; object-fit: contain; margin-bottom: 12px; }
+    .badge-approved { display: inline-block; padding: 6px 16px; border-radius: 20px; background: #22c55e; color: #ffffff; font-weight: 800; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 8px; }
+    .content-body { padding: 32px 28px; }
+    .greeting { font-size: 20px; font-weight: 800; color: #0f172a; margin: 0 0 12px; }
+    .intro-text { font-size: 15px; line-height: 1.6; color: #475569; margin: 0 0 24px; }
+    .details-box { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 26px; }
+    .details-title { font-size: 14px; font-weight: 800; color: #1e40af; margin: 0 0 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .cta-container { text-align: center; margin: 30px 0 20px; }
+    .btn-login { display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff !important; font-weight: 800; font-size: 16px; padding: 14px 32px; border-radius: 10px; text-decoration: none; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35); }
+    .footer-bar { background: #f8fafc; padding: 20px 24px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header-bar">
+      ${logoUrl ? `<img src="${logoUrl}" alt="${companyName}" class="brand-logo" />` : `<h2 style="margin:0 0 6px; font-size: 22px; font-weight:900;">${companyName}</h2>`}
+      <div class="badge-approved">✓ Account Approved</div>
+      <h1 style="margin: 12px 0 0; font-size: 24px; font-weight: 800;">Welcome to the Courier Fleet!</h1>
+    </div>
+    <div class="content-body">
+      <h2 class="greeting">Hello ${agent.name},</h2>
+      <p class="intro-text">
+        Great news! Your <strong>Delivery Agent Account</strong> has been reviewed and officially approved by the ${companyName} operations team. You are now authorized to log in, accept assigned delivery consignments, broadcast live GPS, and collect payments.
+      </p>
+
+      <div class="details-box">
+        <div class="details-title">📋 Verified Courier Profile</div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr><td style="padding: 6px 0; color: #64748b;"><strong>Agent Name:</strong></td><td style="padding: 6px 0; text-align: right; font-weight: 700;">${agent.name}</td></tr>
+          <tr><td style="padding: 6px 0; color: #64748b;"><strong>Registered Email:</strong></td><td style="padding: 6px 0; text-align: right; font-weight: 700;">${agent.email}</td></tr>
+          <tr><td style="padding: 6px 0; color: #64748b;"><strong>Contact Phone:</strong></td><td style="padding: 6px 0; text-align: right; font-weight: 700;">${agent.phone || '—'}</td></tr>
+          <tr><td style="padding: 6px 0; color: #64748b;"><strong>Operational Area:</strong></td><td style="padding: 6px 0; text-align: right; font-weight: 700;">${location}</td></tr>
+          <tr><td style="padding: 6px 0; color: #64748b;"><strong>Vehicle Registered:</strong></td><td style="padding: 6px 0; text-align: right; font-weight: 700;">${vehicle}</td></tr>
+        </table>
+      </div>
+
+      <div class="cta-container">
+        <a href="${loginUrl}" class="btn-login" target="_blank">
+          🛵 Access Agent Dashboard Now →
+        </a>
+      </div>
+
+      <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin-top: 24px;">
+        💡 <strong>Quick Start Tips:</strong><br>
+        1. Log in with your registered email and password.<br>
+        2. Keep your GPS enabled during deliveries so dispatch and customers can track order arrival in real time.<br>
+        3. Verify customer pre-paid UTR payments or collect fee on drop.
+      </p>
+    </div>
+    <div class="footer-bar">
+      © ${new Date().getFullYear()} ${companyName}. All rights reserved.<br>
+      Questions or dispatch support? Contact <a href="mailto:${supportEmail}" style="color: #2563eb;">${supportEmail}</a>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Generate Agent Not Approved / Rejected HTML email
+ */
+export function generateAgentRejectedHtml(agent, remarks, settings) {
+  const companyName = settings?.company_name || 'Trackora Logistics Services Pvt. Ltd.';
+  const logoUrl = settings?.logo_url || '';
+  const supportEmail = settings?.support_email || 'trackoradelivery@gmail.com';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Application Update - ${companyName}</title>
+  <style>
+    body { margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; }
+    .email-container { max-width: 600px; margin: 24px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+    .header-bar { background: linear-gradient(135deg, #1e293b 0%, #475569 100%); padding: 32px 24px; text-align: center; color: #ffffff; }
+    .brand-logo { max-height: 48px; max-width: 180px; object-fit: contain; margin-bottom: 12px; }
+    .badge-rejected { display: inline-block; padding: 6px 16px; border-radius: 20px; background: #ef4444; color: #ffffff; font-weight: 800; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 8px; }
+    .content-body { padding: 32px 28px; }
+    .greeting { font-size: 20px; font-weight: 800; color: #0f172a; margin: 0 0 12px; }
+    .intro-text { font-size: 15px; line-height: 1.6; color: #475569; margin: 0 0 20px; }
+    .remarks-box { background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; color: #991b1b; }
+    .footer-bar { background: #f8fafc; padding: 20px 24px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header-bar">
+      ${logoUrl ? `<img src="${logoUrl}" alt="${companyName}" class="brand-logo" />` : `<h2 style="margin:0 0 6px; font-size: 22px; font-weight:900;">${companyName}</h2>`}
+      <div class="badge-rejected">Application Status Update</div>
+      <h1 style="margin: 12px 0 0; font-size: 22px; font-weight: 800;">Agent Application Status</h1>
+    </div>
+    <div class="content-body">
+      <h2 class="greeting">Hello ${agent.name},</h2>
+      <p class="intro-text">
+        Thank you for your interest in joining <strong>${companyName}</strong> as a Delivery Agent. After a careful review of your submitted registration data and operational requirements, our administration team was unable to approve your application at this time.
+      </p>
+
+      <div class="remarks-box">
+        <h4 style="margin: 0 0 8px; font-size: 14px; font-weight: 800;">Review Notes / Reason:</h4>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5;">
+          ${remarks || 'Your application did not meet our verification criteria or fleet capacity for your selected district at this time.'}
+        </p>
+      </div>
+
+      <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+        If you believe this was an error, or if you have updated documentation (vehicle registration or license), please reach out to our team at <a href="mailto:${supportEmail}" style="color: #2563eb; font-weight: 700;">${supportEmail}</a>.
+      </p>
+    </div>
+    <div class="footer-bar">
+      © ${new Date().getFullYear()} ${companyName}. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Send official Agent Account Approved confirmation email
+ */
+export async function sendAgentApprovedEmail(agent) {
+  const targetEmail = (agent?.email || '').trim();
+  if (!targetEmail || !targetEmail.includes('@')) {
+    console.warn('[Email] Cannot send agent approved email: No valid recipient email');
+    return { ok: false, error: 'No valid recipient email address' };
+  }
+
+  let settings = null;
+  try {
+    settings = await Settings.findOne();
+  } catch (err) {}
+
+  const companyName = settings?.company_name || 'Trackora Logistics Services Pvt. Ltd.';
+  const senderEmail = (process.env.EMAIL_USER || 'trackoradelivery@gmail.com').trim();
+  const fromHeader = process.env.EMAIL_FROM || `"${companyName}" <${senderEmail}>`;
+  const subject = `🎉 Congratulations! Your Delivery Agent Account Has Been Approved | ${companyName}`;
+  const html = generateAgentApprovedHtml(agent, settings);
+  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5001';
+
+  const text = `
+AGENT ACCOUNT APPROVED
+==================================================
+Hello ${agent.name},
+
+Congratulations! Your Trackora Delivery Agent Account has been officially approved by our operations team.
+
+Registered Email: ${agent.email}
+Operational Area: ${agent.district || ''}, ${agent.state || ''}
+Vehicle: ${agent?.agentDetails?.vehicleType || 'Courier Vehicle'}
+
+You can now log in to the agent portal and begin accepting deliveries:
+${clientOrigin}/login
+
+Welcome to the team!
+${companyName}
+==================================================
+  `;
+
+  try {
+    const transporter = createMailTransporter();
+    console.log(`[Email] Sending agent approved email to ${targetEmail}...`);
+
+    const info = await transporter.sendMail({
+      from: fromHeader,
+      to: targetEmail,
+      subject,
+      text,
+      html,
+    });
+
+    console.log(`[Email] Agent approved email sent successfully! MessageId: ${info.messageId} to ${targetEmail}`);
+    return { ok: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Email Error] Failed to send agent approved email to ${targetEmail}:`, err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * Send Agent Application Not Approved / Rejected email
+ */
+export async function sendAgentRejectedEmail(agent, remarks) {
+  const targetEmail = (agent?.email || '').trim();
+  if (!targetEmail || !targetEmail.includes('@')) {
+    console.warn('[Email] Cannot send agent rejected email: No valid recipient email');
+    return { ok: false, error: 'No valid recipient email address' };
+  }
+
+  let settings = null;
+  try {
+    settings = await Settings.findOne();
+  } catch (err) {}
+
+  const companyName = settings?.company_name || 'Trackora Logistics Services Pvt. Ltd.';
+  const senderEmail = (process.env.EMAIL_USER || 'trackoradelivery@gmail.com').trim();
+  const fromHeader = process.env.EMAIL_FROM || `"${companyName}" <${senderEmail}>`;
+  const subject = `Update Regarding Your Trackora Delivery Agent Application | ${companyName}`;
+  const html = generateAgentRejectedHtml(agent, remarks, settings);
+
+  const text = `
+AGENT APPLICATION UPDATE
+==================================================
+Hello ${agent.name},
+
+Thank you for your interest in joining ${companyName}.
+After reviewing your application, our team was unable to approve your delivery agent account at this time.
+
+Review Remarks:
+${remarks || 'Application did not meet verification criteria for the operational territory.'}
+
+For inquiries, contact: ${settings?.support_email || 'trackoradelivery@gmail.com'}
+==================================================
+  `;
+
+  try {
+    const transporter = createMailTransporter();
+    console.log(`[Email] Sending agent rejected email to ${targetEmail}...`);
+
+    const info = await transporter.sendMail({
+      from: fromHeader,
+      to: targetEmail,
+      subject,
+      text,
+      html,
+    });
+
+    console.log(`[Email] Agent rejected email sent successfully! MessageId: ${info.messageId} to ${targetEmail}`);
+    return { ok: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Email Error] Failed to send agent rejected email to ${targetEmail}:`, err.message);
+    return { ok: false, error: err.message };
+  }
+}
+

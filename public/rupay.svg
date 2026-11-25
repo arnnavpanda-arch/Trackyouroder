@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 32" width="110" height="32">
+  <!-- RuPay Forward Double Chevrons -->
+  <g transform="translate(2, 4) skewX(-18)">
+    <polygon points="0,0 7.5,0 15,12 7.5,24 0,24 7.5,12" fill="#00A3E0"/>
+    <polygon points="8,0 15.5,0 23,12 15.5,24 8,24 15.5,12" fill="#F47920"/>
+  </g>
+  <!-- RuPay Brand Typography in Bold Italics -->
+  <text x="31" y="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="900" font-style="italic" letter-spacing="-0.5">
+    <tspan fill="#1A3B8B">Ru</tspan><tspan fill="#F47920">Pay</tspan>
+  </text>
+  <text x="32" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="6.5" font-weight="800" fill="#64748b" letter-spacing="1.2">INDIA</text>
+</svg>

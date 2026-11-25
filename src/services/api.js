@@ -46,6 +46,7 @@ const real = {
   saveUser: (u) => (u.id ? http.put(`/users/${u.id}`, u) : http.post('/users', u)).then(d),
   deleteUser: (id) => http.delete(`/users/${id}`).then(d),
   toggleUser: (id) => http.patch(`/users/${id}/toggle`).then(d),
+  approveAgent: (id, approved, remarks = '') => http.patch(`/users/${id}/approval`, { approved, remarks }).then(d),
   deleteOrder: (id) => http.delete(`/orders/${id}`).then(d),
   deleteAllOrders: () => http.delete('/orders/all').then(d),
   getPricing: () => http.get('/pricing').then(d),

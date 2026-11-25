@@ -19,7 +19,9 @@ export default function DeliveryCelebration({ order, onOpenReceipt }) {
   if (!order || order.status !== 'Delivered') return null;
 
   const isAgent = user?.role === 'agent';
-  const isCustomerOrRecipient = !isAgent; // Customer, user or consignment recipient
+  const isAdmin = user?.role === 'admin';
+  const isCustomer = user?.role === 'user' || (!isAgent && !isAdmin);
+  const isCustomerOrRecipient = !isAgent && !isAdmin; // Customer, user or consignment recipient
 
   const handleSendDeliveredEmail = async () => {
     setSendingEmail(true);
@@ -262,40 +264,31 @@ export default function DeliveryCelebration({ order, onOpenReceipt }) {
         </div>
       </div>
 
-      {/* Spacious Uncompacted Action Buttons (Mobile-Screen Friendly) */}
-      <div className="deliv-actions-bar">
-        <button
-          type="button"
-          className="deliv-btn-primary"
-          onClick={() => nav('/user/new')}
-        >
-          <span className="deliv-btn-icon">🛍️</span>
-          <span>Order Again Now</span>
-          <span className="deliv-btn-arrow">→</span>
-        </button>
-
-        {onOpenReceipt && (
+      {/* Spacious Uncompacted Action Buttons (Only for Customer / User Dashboard; Hidden on both Admin and Agent dashboard) */}
+      {!isAgent && !isAdmin && isCustomer && (
+        <div className="deliv-actions-bar">
           <button
             type="button"
-            className="deliv-btn-secondary"
-            onClick={onOpenReceipt}
+            className="deliv-btn-primary"
+            onClick={() => nav('/user/new')}
           >
-            <span>📄</span>
-            <span>View Tax Invoice / Receipt</span>
+            <span className="deliv-btn-icon">🛍️</span>
+            <span>Order Again Now</span>
+            <span className="deliv-btn-arrow">→</span>
           </button>
-        )}
 
-        <button
-          type="button"
-          className="deliv-btn-secondary"
-          onClick={handleSendDeliveredEmail}
-          disabled={sendingEmail}
-          title="Send delivery receipt & Thank You message to customer's registered email"
-        >
-          <span>{sendingEmail ? '⏳' : '📧'}</span>
-          <span>{sendingEmail ? 'Sending Email...' : 'Send Delivery Email'}</span>
-        </button>
-      </div>
+          {onOpenReceipt && (
+            <button
+              type="button"
+              className="deliv-btn-secondary"
+              onClick={onOpenReceipt}
+            >
+              <span>📄</span>
+              <span>View Tax Invoice / Receipt</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

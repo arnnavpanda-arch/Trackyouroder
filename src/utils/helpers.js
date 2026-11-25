@@ -45,6 +45,43 @@ export const savePricing = (p) => {
   return p;
 };
 
+// Secure deterministic order token encoder / decoder so raw IDs like DL1035 never appear in browser URLs
+const ORDER_TOKEN_SALT = 0x6e;
+
+export function encodeOrderSlug(orderId) {
+  if (!orderId) return '';
+  const str = String(orderId).trim();
+  if (str.startsWith('trk_')) return str;
+  try {
+    const bytes = [];
+    for (let i = 0; i < str.length; i++) {
+      const code = str.charCodeAt(i) ^ ((ORDER_TOKEN_SALT + i * 19) & 0xff);
+      bytes.push(code.toString(16).padStart(2, '0'));
+    }
+    return `trk_${bytes.join('')}`;
+  } catch {
+    return `trk_${btoa(str).replace(/=/g, '').toLowerCase()}`;
+  }
+}
+
+export function decodeOrderSlug(slug) {
+  if (!slug) return '';
+  const str = String(slug).trim();
+  if (!str.startsWith('trk_')) return str;
+  try {
+    const hex = str.slice(4);
+    let out = '';
+    for (let i = 0; i < hex.length; i += 2) {
+      const byteVal = parseInt(hex.substring(i, i + 2), 16);
+      const charCode = byteVal ^ ((ORDER_TOKEN_SALT + (i / 2) * 19) & 0xff);
+      out += String.fromCharCode(charCode);
+    }
+    return out || str;
+  } catch {
+    return str;
+  }
+}
+
 export function evaluateDeliveryOffer(offer, itemValue = 0) {
   if (!offer || !offer.active || offer.type === 'none') {
     return { active: false, eligible: false, isExpired: false };

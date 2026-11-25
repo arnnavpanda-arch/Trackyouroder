@@ -14,7 +14,7 @@ import AddItemValueModal from '../components/AddItemValueModal';
 import ShipmentReceiptModal from '../components/ShipmentReceiptModal';
 import Modal from '../components/Modal';
 import { ErrorBox, Spinner } from '../components/UI';
-import { NEXT, fmtDate } from '../utils/helpers';
+import { NEXT, fmtDate, encodeOrderSlug, decodeOrderSlug } from '../utils/helpers';
 import { getResilientDeviceLocation, parseMapLinkOrAddress } from '../utils/geoHelper';
 import DeliveryCelebration from '../components/DeliveryCelebration';
 import './OrderDetails.css';
@@ -23,8 +23,22 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
   const { id: paramId } = useParams();
   const location = useLocation();
   const nav = useNavigate();
-  const id = propOrderId || paramId || location.state?.orderId || sessionStorage.getItem('dt_user_active_order');
+  const decodedParamId = paramId ? decodeOrderSlug(paramId) : null;
+  const id = propOrderId || decodedParamId || location.state?.orderId || sessionStorage.getItem('dt_user_active_order');
   const { user, socket, toast, settings } = useApp() || {};
+
+  // URL security: If the browser URL exposes the raw sequential order ID (e.g. /admin/orders/DL1035 or /user/orders/DL1035),
+  // immediately mask it into the secure token (e.g. /admin/orders/trk_2acde...) so raw order ID is never visible in browser link
+  useEffect(() => {
+    if (paramId && !paramId.startsWith('trk_') && id) {
+      const safeSlug = encodeOrderSlug(id);
+      const newPath = location.pathname.replace(new RegExp(`/${paramId}(/|$)`), `/${safeSlug}$1`);
+      if (newPath !== location.pathname) {
+        nav(newPath, { replace: true, state: location.state });
+      }
+    }
+  }, [paramId, id, location.pathname, location.state, nav]);
+
   const { data: order, loading, error, reload } = useLiveData(
     () => (id ? api.getOrder(id) : Promise.reject(new Error('No order selected'))),
     [id]

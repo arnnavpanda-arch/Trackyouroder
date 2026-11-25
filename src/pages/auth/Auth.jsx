@@ -7,6 +7,7 @@ import { ALL_INDIAN_STATES, INDIA_STATES_DATA, isRegionEligible } from '../../ut
 import { api } from '../../services/api';
 import { getSocket } from '../../services/socket';
 import Footer from '../../components/Footer';
+import Modal from '../../components/Modal';
 
 function useLiveParcelStats() {
   const [stats, setStats] = useState(() => {
@@ -227,7 +228,23 @@ function AuthFlow({ initialAction = 'signin' }) {
   const [action, setAction] = useState(initialAction); // 'signin' | 'register'
   const [selectedRole, setSelectedRole] = useState('user');
 
-  const [v, setV] = useState({ name: '', email: '', phone: '', password: '' });
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [legalDocType, setLegalDocType] = useState('terms');
+
+  const [v, setV] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    state: '',
+    district: '',
+    vehicleType: 'Bike',
+    vehicleNumber: '',
+    drivingLicense: '',
+    emergencyContact: '',
+    experienceYears: '1-2 Years',
+  });
   const [errs, setErrs] = useState({});
   const [busy, setBusy] = useState(false);
 
@@ -271,10 +288,28 @@ function AuthFlow({ initialAction = 'signin' }) {
         phone: '',
         state: '',
         district: '',
+        vehicleType: 'Bike',
+        vehicleNumber: '',
+        drivingLicense: '',
+        emergencyContact: '',
+        experienceYears: '1-2 Years',
       });
     } else {
-      setV({ name: '', email: '', phone: '', password: '', state: '', district: '' });
+      setV({
+        name: '',
+        email: '',
+        phone: '',
+        password: '',
+        state: '',
+        district: '',
+        vehicleType: 'Bike',
+        vehicleNumber: '',
+        drivingLicense: '',
+        emergencyContact: '',
+        experienceYears: '1-2 Years',
+      });
     }
+    setAgreeTerms(false);
     setErrs({});
     setStep('form');
   };
@@ -311,6 +346,19 @@ function AuthFlow({ initialAction = 'signin' }) {
       password: rules.password
     });
 
+    if (!agreeTerms) {
+      er.terms = 'Please accept the Privacy Policy and Terms & Conditions to create your account.';
+    }
+
+    if (selectedRole === 'agent') {
+      if (!v.vehicleNumber?.trim()) {
+        er.vehicleNumber = 'Vehicle registration number is required for verification';
+      }
+      if (!v.drivingLicense?.trim()) {
+        er.drivingLicense = 'Driving license number is required for verification';
+      }
+    }
+
     if (selectedRole !== 'admin') {
       if (!v.state) {
         er.state = 'Please select your State';
@@ -329,8 +377,23 @@ function AuthFlow({ initialAction = 'signin' }) {
     if (Object.keys(er).length) return;
     setBusy(true);
     try {
-      const u = await register({ ...v, role: selectedRole });
-      toast('Account created successfully!', 'success');
+      const payload = {
+        ...v,
+        role: selectedRole,
+        agentDetails: selectedRole === 'agent' ? {
+          vehicleType: v.vehicleType || 'Bike',
+          vehicleNumber: (v.vehicleNumber || '').trim(),
+          drivingLicense: (v.drivingLicense || '').trim(),
+          emergencyContact: (v.emergencyContact || '').trim(),
+          experienceYears: v.experienceYears || '1-2 Years',
+        } : undefined,
+      };
+      const u = await register(payload);
+      if (selectedRole === 'agent') {
+        toast('Delivery agent application submitted! Awaiting admin verification & approval.', 'info');
+      } else {
+        toast('Account created successfully! Welcome to Trackora.', 'success');
+      }
       nav(homeFor(u.role));
     } catch (err) {
       toast(err.message, 'error');
@@ -599,6 +662,69 @@ function AuthFlow({ initialAction = 'signin' }) {
               </>
             )}
 
+            {selectedRole === 'agent' && (
+              <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: 12, border: '1.5px solid #fed7aa', marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, color: '#c2410c', fontWeight: 800, fontSize: '0.88rem' }}>
+                  <span>🛵</span> Delivery Courier Profile (Required for Admin Approval)
+                </div>
+
+                <div className="grid2">
+                  <Field label="Vehicle Type" error={errs.vehicleType}>
+                    <select
+                      value={v.vehicleType || 'Bike'}
+                      onChange={set('vehicleType')}
+                      style={{ padding: '10px 12px', borderRadius: 8, border: '1.5px solid #cbd5e1', fontSize: '0.92rem', background: '#fff', width: '100%' }}
+                    >
+                      <option value="Bike">Motorcycle / Bike</option>
+                      <option value="Scooter">Scooter / Activa</option>
+                      <option value="Electric Scooter">Electric Two-Wheeler (EV)</option>
+                      <option value="Van">Delivery Van / 3-Wheeler</option>
+                      <option value="Bicycle">Bicycle</option>
+                    </select>
+                  </Field>
+
+                  <Field label="Vehicle Reg. Number" error={errs.vehicleNumber}>
+                    <input
+                      value={v.vehicleNumber || ''}
+                      onChange={set('vehicleNumber')}
+                      placeholder="e.g. DL 01 AB 1234"
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid2">
+                  <Field label="Driving License Number" error={errs.drivingLicense}>
+                    <input
+                      value={v.drivingLicense || ''}
+                      onChange={set('drivingLicense')}
+                      placeholder="e.g. DL-1420110012345"
+                    />
+                  </Field>
+
+                  <Field label="Delivery Experience" error={errs.experienceYears}>
+                    <select
+                      value={v.experienceYears || '1-2 Years'}
+                      onChange={set('experienceYears')}
+                      style={{ padding: '10px 12px', borderRadius: 8, border: '1.5px solid #cbd5e1', fontSize: '0.92rem', background: '#fff', width: '100%' }}
+                    >
+                      <option value="Fresher">Fresher / New to Courier</option>
+                      <option value="1-2 Years">1 - 2 Years</option>
+                      <option value="3-5 Years">3 - 5 Years</option>
+                      <option value="5+ Years">5+ Years Experience</option>
+                    </select>
+                  </Field>
+                </div>
+
+                <Field label="Emergency Contact (Name & Phone)" error={errs.emergencyContact}>
+                  <input
+                    value={v.emergencyContact || ''}
+                    onChange={set('emergencyContact')}
+                    placeholder="e.g. Relative / Contact - 9876543210"
+                  />
+                </Field>
+              </div>
+            )}
+
             <Field label="Password" error={errs.password}>
               <input
                 type="password"
@@ -608,6 +734,54 @@ function AuthFlow({ initialAction = 'signin' }) {
                 autoComplete="new-password"
               />
             </Field>
+
+            {/* Privacy Policy & Terms and Conditions Checkbox */}
+            <div
+              className="auth-terms-box"
+              style={{
+                background: '#f8fafc',
+                padding: '12px 14px',
+                borderRadius: 10,
+                border: `1.5px solid ${errs.terms ? '#fca5a5' : '#cbd5e1'}`,
+                marginTop: 14,
+                marginBottom: 16,
+              }}
+            >
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={agreeTerms}
+                  onChange={(e) => {
+                    setAgreeTerms(e.target.checked);
+                    if (e.target.checked) setErrs((prev) => ({ ...prev, terms: '' }));
+                  }}
+                  style={{ width: 18, height: 18, marginTop: 2, accentColor: '#2563eb', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '0.84rem', color: '#334155', lineHeight: 1.45 }}>
+                  I have read and agree to the{' '}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalDocType('privacy'); setShowLegalModal(true); }}
+                    style={{ background: 'none', border: 'none', padding: 0, color: '#2563eb', textDecoration: 'underline', fontWeight: 700, cursor: 'pointer', fontSize: 'inherit' }}
+                  >
+                    Privacy Policy
+                  </button>{' '}
+                  and{' '}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalDocType('terms'); setShowLegalModal(true); }}
+                    style={{ background: 'none', border: 'none', padding: 0, color: '#2563eb', textDecoration: 'underline', fontWeight: 700, cursor: 'pointer', fontSize: 'inherit' }}
+                  >
+                    Terms & Conditions
+                  </button>.
+                </span>
+              </label>
+              {errs.terms && (
+                <p style={{ margin: '6px 0 0', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
+                  ⚠️ {errs.terms}
+                </p>
+              )}
+            </div>
 
             <button className="btn block" disabled={busy}>
               {busy ? 'Creating…' : `Register as ${currentRole.label}`}
@@ -635,6 +809,59 @@ function AuthFlow({ initialAction = 'signin' }) {
               </button>
             </p>
           </form>
+        )}
+
+        {showLegalModal && (
+          <Modal
+            title={legalDocType === 'privacy' ? 'Privacy Policy' : 'Terms & Conditions'}
+            onClose={() => setShowLegalModal(false)}
+            footer={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <span style={{ fontSize: 12, color: '#64748b' }}>
+                  Trackora Logistics Services
+                </span>
+                <button
+                  type="button"
+                  className="btn sm"
+                  onClick={() => {
+                    setAgreeTerms(true);
+                    setErrs((prev) => ({ ...prev, terms: '' }));
+                    setShowLegalModal(false);
+                  }}
+                >
+                  ✓ I Agree & Accept
+                </button>
+              </div>
+            }
+          >
+            <div style={{ maxHeight: 380, overflowY: 'auto', padding: '4px 6px', fontSize: 13, color: '#334155', lineHeight: 1.6 }}>
+              {legalDocType === 'privacy' ? (
+                settings?.privacy_policy ? (
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{settings.privacy_policy}</div>
+                ) : (
+                  <div>
+                    <h4 style={{ margin: '0 0 8px', color: '#0f172a' }}>Privacy Policy — Trackora</h4>
+                    <p>We respect your privacy and are committed to protecting personal data collected across our parcel tracking, consignment booking, and delivery platform.</p>
+                    <p><strong>1. Information We Collect:</strong> We collect contact details (name, email, phone number) and consignment pickup and drop addresses to fulfill delivery requests.</p>
+                    <p><strong>2. Location Services:</strong> Couriers and customers broadcast live location strictly during active deliveries to ensure turn-by-turn road visibility and accurate delivery ETAs.</p>
+                    <p><strong>3. Payment Security:</strong> Payment information is processed via secure banking channels. We never sell your personal data to third parties.</p>
+                  </div>
+                )
+              ) : (
+                settings?.terms_and_conditions ? (
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{settings.terms_and_conditions}</div>
+                ) : (
+                  <div>
+                    <h4 style={{ margin: '0 0 8px', color: '#0f172a' }}>Terms & Conditions — Trackora</h4>
+                    <p>By registering or using Trackora, you agree to comply with our platform policies and delivery service standards.</p>
+                    <p><strong>1. Courier Obligations:</strong> Registered delivery agents must maintain a valid driving license, operational vehicle, and verify consignments with due care.</p>
+                    <p><strong>2. Consignment Care:</strong> Prohibited or illegal goods may not be booked for transport. Fees are determined by minimum distance boundary and freight rates.</p>
+                    <p><strong>3. Administrative Review:</strong> Delivery agent accounts require administrative verification and approval prior to activation.</p>
+                  </div>
+                )
+              )}
+            </div>
+          </Modal>
         )}
         <Footer />
       </section>

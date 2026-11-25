@@ -118,11 +118,28 @@ export function AppProvider({ children }) {
         loadSettings();
       }
     };
+    const onAgentApproval = (payload) => {
+      if (payload && (payload.userId === user.id || payload.userId === user._id)) {
+        setUser((prev) => ({
+          ...prev,
+          isApproved: payload.isApproved,
+          approvalStatus: payload.approvalStatus,
+          approvalRemarks: payload.remarks || '',
+        }));
+        if (payload.isApproved) {
+          toast('🎉 Congratulations! Your delivery agent account has been approved by admin.', 'success');
+        } else {
+          toast('⚠️ Notice: Your agent account application was not approved.', 'warning');
+        }
+      }
+    };
     socket.on('newNotification', onNote);
     socket.on('settingsUpdated', onSettings);
+    socket.on('agentApprovalChanged', onAgentApproval);
     return () => {
       socket.off('newNotification', onNote);
       socket.off('settingsUpdated', onSettings);
+      socket.off('agentApprovalChanged', onAgentApproval);
     };
   }, [socket, user, toast, loadSettings]);
 

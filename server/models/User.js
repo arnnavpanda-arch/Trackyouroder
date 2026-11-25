@@ -42,6 +42,52 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    isApproved: {
+      type: Boolean,
+      default: function () {
+        return this.role !== 'agent';
+      },
+    },
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: function () {
+        return this.role === 'agent' ? 'pending' : 'approved';
+      },
+    },
+    approvalRemarks: {
+      type: String,
+      default: '',
+    },
+    approvedAt: {
+      type: Date,
+      default: null,
+    },
+    agentDetails: {
+      vehicleType: {
+        type: String,
+        default: 'Bike',
+      },
+      vehicleNumber: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      drivingLicense: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      emergencyContact: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      experienceYears: {
+        type: String,
+        default: '',
+      },
+    },
   },
   {
     timestamps: true,

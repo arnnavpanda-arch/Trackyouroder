@@ -1,18 +1,20 @@
 import { useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { decodeOrderSlug } from '../utils/helpers';
 import OrderDetails from './OrderDetails';
 
 export default function PublicTrackingPage() {
   const { id } = useParams();
   const { user } = useApp();
   const nav = useNavigate();
+  const decodedId = id ? decodeOrderSlug(id) : '';
 
   useEffect(() => {
-    if (id) {
-      sessionStorage.setItem('dt_user_active_order', id);
+    if (decodedId) {
+      sessionStorage.setItem('dt_user_active_order', decodedId);
     }
-  }, [id]);
+  }, [decodedId]);
 
   const handleBack = () => {
     if (user?.role === 'user') {

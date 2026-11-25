@@ -9,7 +9,7 @@ import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
 import MapView from '../../components/MapView';
 import AssignAgentModal from '../../components/AssignAgentModal';
-import { DEFAULT_OFFER, DEFAULT_PRICING, STATUSES, computeStats, durH, evaluateDeliveryOffer, fmtDate, getPricing, rules, series, validate } from '../../utils/helpers';
+import { DEFAULT_OFFER, DEFAULT_PRICING, STATUSES, computeStats, durH, evaluateDeliveryOffer, fmtDate, getPricing, savePricing, encodeOrderSlug, rules, series, validate } from '../../utils/helpers';
 import OfferBanner from '../../components/OfferBanner';
 import AdminOfferEditor from '../../components/AdminOfferEditor';
 import { PageHead, Spinner, ErrorBox, StatCard, Icon, Empty, Tilt, Field } from '../../components/UI';
@@ -22,6 +22,7 @@ export function AdminDashboard() {
   const { toast, socket, settings, setSettings } = useApp() || {};
   const [logo, setLogo] = useState(() => settings?.logo_url || localStorage.getItem('trackora_custom_logo') || null);
   const [pricing, setPricing] = useState(() => getPricing());
+  const [pricingModified, setPricingModified] = useState(false);
   const [savingPricing, setSavingPricing] = useState(false);
   const [simDist, setSimDist] = useState(8);
   const [offer, setOffer] = useState(() => (pricing?.delivery_offer ? { ...DEFAULT_OFFER, ...pricing.delivery_offer } : DEFAULT_OFFER));
@@ -41,13 +42,13 @@ export function AdminDashboard() {
   }, [settings?.logo_url]);
 
   useEffect(() => {
-    if (data && data[2]) {
+    if (data && data[2] && !pricingModified) {
       setPricing(data[2]);
       if (data[2].delivery_offer) {
         setOffer({ ...DEFAULT_OFFER, ...data[2].delivery_offer });
       }
     }
-  }, [data]);
+  }, [data, pricingModified]);
 
   // Real-time socket sync for Admin
   useEffect(() => {
@@ -57,11 +58,19 @@ export function AdminDashboard() {
         setOffer({ ...DEFAULT_OFFER, ...updated });
       }
     };
+    const handlePricingUpdated = (updated) => {
+      if (updated && !pricingModified) {
+        setPricing(updated);
+        savePricing(updated);
+      }
+    };
     socket.on('offerUpdated', handleOfferUpdated);
+    socket.on('pricingUpdated', handlePricingUpdated);
     return () => {
       socket.off('offerUpdated', handleOfferUpdated);
+      socket.off('pricingUpdated', handlePricingUpdated);
     };
-  }, [socket]);
+  }, [socket, pricingModified]);
 
   const toDatetimeLocal = (d) => {
     if (!d) return '';
@@ -113,14 +122,34 @@ export function AdminDashboard() {
     }
   };
 
+  const handlePricingFieldChange = (field, val) => {
+    setPricingModified(true);
+    setPricing((prev) => ({
+      ...prev,
+      [field]: val === '' ? '' : val,
+    }));
+  };
+
   const handleSavePricing = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setSavingPricing(true);
     try {
-      await api.savePricing(pricing);
-      toast('Delivery & cancellation fee rates saved successfully!', 'success');
+      const sanitized = {
+        ...pricing,
+        base_distance_km: Math.max(0.5, Number(pricing.base_distance_km) || 5),
+        min_distance_fee: Math.max(0, Number(pricing.min_distance_fee) || 50),
+        extra_per_km: Math.max(0, Number(pricing.extra_per_km) || 12),
+        cancellation_fee: Math.max(0, Number(pricing.cancellation_fee) || 30),
+      };
+      const res = await api.savePricing(sanitized);
+      const updated = res || sanitized;
+      setPricing(updated);
+      savePricing(updated);
+      setPricingModified(false);
+      toast('Delivery distance rates & cancellation fee saved successfully!', 'success');
+      if (typeof reload === 'function') reload();
     } catch (err) {
-      toast(err.message || 'Failed to save pricing', 'error');
+      toast(err.message || 'Failed to save pricing rates', 'error');
     } finally {
       setSavingPricing(false);
     }
@@ -194,6 +223,26 @@ export function AdminDashboard() {
   const perDay = series(orders, from, to);
   const pie = STATUSES.map((x) => ({ name: x, value: orders.filter((o) => o.status === x).length }));
   const agents = users.filter((u) => u.role === 'agent').map((a) => ({ name: a.name.split(' ')[0], delivered: orders.filter((o) => o.agentId === a.id && o.status === 'Delivered').length }));
+  const [approvingAgentId, setApprovingAgentId] = useState(null);
+  const pendingAgents = (users || []).filter((u) => u.role === 'agent' && (u.isApproved === false || u.approvalStatus === 'pending'));
+
+  const handleApproveAgent = async (ag, approved) => {
+    let remarks = '';
+    if (!approved) {
+      remarks = window.prompt(`Provide a reason for not approving ${ag.name}'s application (optional):`, 'Application did not meet operational criteria for the selected territory.') || '';
+    }
+    setApprovingAgentId(ag.id);
+    try {
+      const res = await api.approveAgent(ag.id, approved, remarks);
+      toast(res.message || (approved ? 'Agent approved successfully' : 'Agent application rejected'), 'success');
+      reload();
+    } catch (e) {
+      toast(e.message || 'Failed to update agent approval', 'error');
+    } finally {
+      setApprovingAgentId(null);
+    }
+  };
+
   return (
     <>
       <PageHead title="Operations overview" sub="Live numbers across all deliveries">
@@ -207,6 +256,95 @@ export function AdminDashboard() {
           </Link>
         </div>
       </PageHead>
+
+      {/* SECTION: AGENT APPROVALS (PENDING DELIVERY AGENTS) */}
+      {pendingAgents.length > 0 && (
+        <div className="card" style={{ marginBottom: 18, borderRadius: 16, border: '2px solid #fed7aa', background: '#fffbeb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, borderBottom: '1.5px solid #fde68a', paddingBottom: 14, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: '1.6rem' }}>🛵</span>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#9a3412' }}>
+                  Delivery Agent Approvals Needed ({pendingAgents.length})
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: 13, color: '#78350f' }}>
+                  New delivery agents have registered and are waiting for administrative review. Approved agents can start accepting deliveries immediately.
+                </p>
+              </div>
+            </div>
+            <Link to="/admin/users" className="btn sm ghost" style={{ fontWeight: 700 }}>
+              Manage All Users & Agents →
+            </Link>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+            {pendingAgents.map((ag) => (
+              <div
+                key={ag.id}
+                style={{
+                  background: '#ffffff',
+                  borderRadius: 12,
+                  border: '1.5px solid #fed7aa',
+                  padding: '16px',
+                  boxShadow: '0 4px 12px rgba(234, 88, 12, 0.06)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{ag.name}</h4>
+                      <small style={{ color: '#64748b' }}>{ag.email}</small>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 800, background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', padding: '2px 8px', borderRadius: 12 }}>
+                      ⏳ Pending Approval
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 10px', fontSize: 12, color: '#334155', background: '#f8fafc', padding: '10px 12px', borderRadius: 8, marginBottom: 14 }}>
+                    <div><strong>Phone:</strong> {ag.phone || '—'}</div>
+                    <div><strong>Territory:</strong> {ag.district || '—'}, {ag.state || '—'}</div>
+                    <div><strong>Vehicle:</strong> {ag.agentDetails?.vehicleType || 'Bike'}</div>
+                    <div><strong>Reg No:</strong> {ag.agentDetails?.vehicleNumber || '—'}</div>
+                    <div><strong>License:</strong> {ag.agentDetails?.drivingLicense || '—'}</div>
+                    <div><strong>Experience:</strong> {ag.agentDetails?.experienceYears || '1-2 Years'}</div>
+                    {ag.agentDetails?.emergencyContact && (
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <strong>Emergency:</strong> {ag.agentDetails?.emergencyContact}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="btn sm"
+                    disabled={approvingAgentId === ag.id}
+                    onClick={() => handleApproveAgent(ag, true)}
+                    style={{ flex: 1, background: '#16a34a', borderColor: '#16a34a', color: '#fff', fontWeight: 800 }}
+                  >
+                    {approvingAgentId === ag.id ? 'Approving…' : '✓ Approve Agent'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn sm ghost"
+                    disabled={approvingAgentId === ag.id}
+                    onClick={() => handleApproveAgent(ag, false)}
+                    style={{ color: '#dc2626', borderColor: '#fca5a5', fontWeight: 700 }}
+                  >
+                    ✕ Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="card admin-branding-card" style={{ marginBottom: 18 }}>
         <div className="admin-branding-header">
           <div className="admin-branding-left">
@@ -259,8 +397,11 @@ export function AdminDashboard() {
             className="btn sm ghost"
             onClick={async () => {
               setPricing(DEFAULT_PRICING);
+              setPricingModified(false);
+              savePricing(DEFAULT_PRICING);
               await api.savePricing(DEFAULT_PRICING);
               toast('Reset fee rates to defaults', 'info');
+              if (typeof reload === 'function') reload();
             }}
           >
             Reset Defaults
@@ -284,10 +425,10 @@ export function AdminDashboard() {
                   <span className="input-prefix" style={{ background: '#eff6ff', color: '#2563eb', fontWeight: 700 }}>km</span>
                   <input
                     type="number"
-                    min="1"
+                    min="0.5"
                     step="0.5"
-                    value={pricing.base_distance_km ?? 5}
-                    onChange={(e) => setPricing((p) => ({ ...p, base_distance_km: Math.max(0.5, Number(e.target.value) || 0) }))}
+                    value={pricing.base_distance_km !== undefined ? pricing.base_distance_km : ''}
+                    onChange={(e) => handlePricingFieldChange('base_distance_km', e.target.value)}
                     required
                   />
                 </div>
@@ -302,8 +443,8 @@ export function AdminDashboard() {
                     type="number"
                     min="0"
                     step="1"
-                    value={pricing.min_distance_fee ?? 50}
-                    onChange={(e) => setPricing((p) => ({ ...p, min_distance_fee: Math.max(0, Number(e.target.value) || 0) }))}
+                    value={pricing.min_distance_fee !== undefined ? pricing.min_distance_fee : ''}
+                    onChange={(e) => handlePricingFieldChange('min_distance_fee', e.target.value)}
                     required
                   />
                 </div>
@@ -316,10 +457,10 @@ export function AdminDashboard() {
                   <span className="input-prefix" style={{ background: '#fffbeb', color: '#d97706', fontWeight: 700 }}>₹/km</span>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     step="0.5"
-                    value={pricing.extra_per_km ?? 12}
-                    onChange={(e) => setPricing((p) => ({ ...p, extra_per_km: Math.max(0, Number(e.target.value) || 0) }))}
+                    value={pricing.extra_per_km !== undefined ? pricing.extra_per_km : ''}
+                    onChange={(e) => handlePricingFieldChange('extra_per_km', e.target.value)}
                     required
                   />
                 </div>
@@ -397,8 +538,8 @@ export function AdminDashboard() {
                     type="number"
                     min="0"
                     step="1"
-                    value={pricing.cancellation_fee ?? 30}
-                    onChange={(e) => setPricing((p) => ({ ...p, cancellation_fee: Math.max(0, Number(e.target.value) || 0) }))}
+                    value={pricing.cancellation_fee !== undefined ? pricing.cancellation_fee : ''}
+                    onChange={(e) => handlePricingFieldChange('cancellation_fee', e.target.value)}
                     required
                   />
                 </div>
@@ -507,7 +648,7 @@ export function ManageOrders() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
           {/* Button 1: View */}
           <Link
-            to={`/admin/orders/${o.id}`}
+            to={`/admin/orders/${encodeOrderSlug(o.id)}`}
             style={{
               padding: '5px 11px',
               fontSize: 12,
@@ -626,7 +767,7 @@ export function ManageOrders() {
         <div className="search"><Icon n="search" size={18} /><input placeholder="Search order, customer, agent, address" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <select value={st} onChange={(e) => setSt(e.target.value)}>{['All', ...STATUSES].map((s) => <option key={s}>{s}</option>)}</select>
       </div>
-      <div className="card"><DataTable columns={cols} rows={rows} loading={loading} onRowClick={(o) => nav(`/admin/orders/${o.id}`)} empty="No orders match" hint="Clear the search or filter." /></div>
+      <div className="card"><DataTable columns={cols} rows={rows} loading={loading} onRowClick={(o) => nav(`/admin/orders/${encodeOrderSlug(o.id)}`)} empty="No orders match" hint="Clear the search or filter." /></div>
       {target && <AssignAgentModal order={target} onClose={() => setTarget(null)} onDone={reload} />}
 
       {/* Single Order Delete Confirmation Modal */}
@@ -686,13 +827,45 @@ export function ManageUsers() {
   const [form, setForm] = useState(null);
   const [deletingUser, setDeletingUser] = useState(null);
   const [busyDelete, setBusyDelete] = useState(false);
+  const [approvingAgentId, setApprovingAgentId] = useState(null);
 
   const customers = useMemo(() => (data || []).filter((u) => u.role === 'user'), [data]);
   const agents = useMemo(() => (data || []).filter((u) => u.role === 'agent'), [data]);
   const admins = useMemo(() => (data || []).filter((u) => u.role === 'admin'), [data]);
+  const pendingAgents = useMemo(() => (data || []).filter((u) => u.role === 'agent' && (u.isApproved === false || u.approvalStatus === 'pending')), [data]);
 
-  const rows = useMemo(() => (data || []).filter((u) => (role === 'all' || u.role === role) && (!q || `${u.name} ${u.email} ${u.phone || ''}`.toLowerCase().includes(q.toLowerCase()))), [data, role, q]);
+  const rows = useMemo(() => {
+    let list = data || [];
+    if (role === 'pending_approvals') {
+      list = pendingAgents;
+    } else if (role !== 'all') {
+      list = list.filter((u) => u.role === role);
+    }
+    if (q) {
+      const qLower = q.toLowerCase();
+      list = list.filter((u) => `${u.name} ${u.email} ${u.phone || ''} ${u.district || ''} ${u.state || ''}`.toLowerCase().includes(qLower));
+    }
+    return list;
+  }, [data, role, q, pendingAgents]);
+
   const act = async (fn, msg) => { try { await fn(); toast(msg, 'success'); reload(); } catch (e) { toast(e.message, 'error'); } };
+
+  const handleApproveAgent = async (u, approved) => {
+    let remarks = '';
+    if (!approved) {
+      remarks = window.prompt(`Provide a reason for not approving ${u.name}'s application (optional):`, 'Application did not meet verification criteria for the selected territory.') || '';
+    }
+    setApprovingAgentId(u.id);
+    try {
+      const res = await api.approveAgent(u.id, approved, remarks);
+      toast(res.message || (approved ? 'Agent approved successfully' : 'Agent application rejected'), 'success');
+      reload();
+    } catch (e) {
+      toast(e.message || 'Failed to update agent approval', 'error');
+    } finally {
+      setApprovingAgentId(null);
+    }
+  };
 
   const handleDeleteUser = async () => {
     if (!deletingUser) return;
@@ -728,9 +901,88 @@ export function ManageUsers() {
       </span>
     )},
     { key: 'phone', header: 'Phone', render: (u) => u.phone || <span className="muted">—</span> },
-    { key: 'active', header: 'Status', render: (u) => <span className={`pill ${u.active ? 'on' : 'off'}`}>{u.active ? 'Active' : 'Inactive'}</span> },
+    ...(role === 'agent' || role === 'pending_approvals' ? [
+      {
+        key: 'vehicle',
+        header: 'Courier Profile',
+        render: (u) => (
+          u.agentDetails?.vehicleNumber ? (
+            <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+              <div><b>{u.agentDetails?.vehicleType || 'Vehicle'}:</b> {u.agentDetails?.vehicleNumber}</div>
+              <div style={{ color: '#64748b' }}>DL: {u.agentDetails?.drivingLicense || '—'} · Exp: {u.agentDetails?.experienceYears || '—'}</div>
+              {u.agentDetails?.emergencyContact && (
+                <div style={{ fontSize: 11, color: '#9a3412' }}>🚨 {u.agentDetails?.emergencyContact}</div>
+              )}
+            </div>
+          ) : <span className="muted">—</span>
+        )
+      }
+    ] : []),
+    { key: 'active', header: 'Status', render: (u) => (
+      u.role === 'agent' ? (
+        u.isApproved === false || u.approvalStatus === 'pending' ? (
+          <span className="pill off" style={{ background: '#fff7ed', color: '#c2410c', borderColor: '#fed7aa', fontWeight: 800 }}>
+            ⏳ Pending Approval
+          </span>
+        ) : u.approvalStatus === 'rejected' ? (
+          <span className="pill off" style={{ background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca', fontWeight: 800 }}>
+            ❌ Rejected
+          </span>
+        ) : (
+          <span className="pill on" style={{ background: '#f0fdf4', color: '#166534', borderColor: '#bbf7d0', fontWeight: 800 }}>
+            ✓ Approved
+          </span>
+        )
+      ) : (
+        <span className={`pill ${u.active ? 'on' : 'off'}`}>{u.active ? 'Active' : 'Inactive'}</span>
+      )
+    )},
     { key: 'act', header: 'Actions', render: (u) => (
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
+        {u.role === 'agent' && (u.isApproved === false || u.approvalStatus === 'pending') && (
+          <button
+            type="button"
+            onClick={() => handleApproveAgent(u, true)}
+            disabled={approvingAgentId === u.id}
+            style={{
+              padding: '4px 10px',
+              fontSize: 12,
+              fontWeight: 800,
+              borderRadius: 6,
+              background: '#f0fdf4',
+              color: '#15803d',
+              border: '1px solid #bbf7d0',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span>✓</span> Approve
+          </button>
+        )}
+        {u.role === 'agent' && (u.isApproved === false || u.approvalStatus === 'pending') && (
+          <button
+            type="button"
+            onClick={() => handleApproveAgent(u, false)}
+            disabled={approvingAgentId === u.id}
+            style={{
+              padding: '4px 10px',
+              fontSize: 12,
+              fontWeight: 700,
+              borderRadius: 6,
+              background: '#fef2f2',
+              color: '#dc2626',
+              border: '1px solid #fecaca',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span>✕</span> Reject
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setForm({ ...u, password: '' })}
@@ -798,20 +1050,32 @@ export function ManageUsers() {
   return (
     <>
       <PageHead
-        title={role === 'user' ? 'Customers' : role === 'agent' ? 'Delivery Agents' : role === 'admin' ? 'Administrators' : 'Users & Agents'}
-        sub={role === 'user' ? `${customers.length} registered customers` : role === 'agent' ? `${agents.length} active delivery agents` : 'Create, edit and control access'}
+        title={role === 'user' ? 'Customers' : role === 'agent' ? 'Delivery Agents' : role === 'admin' ? 'Administrators' : role === 'pending_approvals' ? 'Agent Approvals' : 'Users & Agents'}
+        sub={role === 'user' ? `${customers.length} registered customers` : role === 'agent' ? `${agents.length} active delivery agents` : role === 'pending_approvals' ? `${pendingAgents.length} delivery agents awaiting review` : 'Create, edit and control access'}
       >
         <button
           className="btn"
-          onClick={() => setForm({ name: '', email: '', phone: '', role: role === 'all' ? 'user' : role, password: '' })}
+          onClick={() => setForm({ name: '', email: '', phone: '', role: role === 'all' || role === 'pending_approvals' ? 'user' : role, password: '' })}
         >
           <Icon n="plus" size={18} />
           {role === 'user' ? 'Add Customer' : role === 'agent' ? 'Add Delivery Agent' : 'Add Account'}
         </button>
       </PageHead>
 
-      {/* Segmented Role Tabs for separating Customers and Delivery Agents */}
+      {/* Segmented Role Tabs for separating Customers, Delivery Agents, and Pending Approvals */}
       <div className="tabs" style={{ marginBottom: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className={`tab ${role === 'pending_approvals' ? 'active' : ''}`}
+          onClick={() => setRole('pending_approvals')}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+        >
+          <span>⏳ Agent Approvals</span>
+          <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: pendingAgents.length > 0 ? '#ea580c' : '#f1f5f9', color: pendingAgents.length > 0 ? '#fff' : '#475569', fontWeight: 800 }}>
+            {pendingAgents.length}
+          </span>
+        </button>
+
         <button
           type="button"
           className={`tab ${role === 'user' ? 'active' : ''}`}
@@ -864,6 +1128,7 @@ export function ManageUsers() {
       <div className="filters card">
         <div className="search"><Icon n="search" size={18} /><input placeholder="Search name, email or phone" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <select value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="pending_approvals">⏳ Pending Agent Approvals ({pendingAgents.length})</option>
           <option value="user">Customers Only</option>
           <option value="agent">Delivery Agents Only</option>
           <option value="admin">Admins Only</option>
@@ -971,7 +1236,7 @@ export function LiveMonitor() {
           <div className="card map-card"><MapView markers={markers} height={560} /></div>
           <div className="card side-list"><h3>Active deliveries</h3>
             {active.length === 0 ? <p className="muted">Nothing on the road right now.</p> : active.map((o) => (
-              <Link key={o.id} to={`/admin/orders/${o.id}`} className="li"><div><b>{o.id}</b><small>{o.agentName} → {o.drop?.address ? o.drop.address.split(',')[0] : 'Drop'}</small></div><StatusBadge status={o.status} /></Link>
+              <Link key={o.id} to={`/admin/orders/${encodeOrderSlug(o.id)}`} className="li"><div><b>{o.id}</b><small>{o.agentName} → {o.drop?.address ? o.drop.address.split(',')[0] : 'Drop'}</small></div><StatusBadge status={o.status} /></Link>
             ))}
           </div>
         </div>

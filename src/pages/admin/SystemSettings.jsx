@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { PageHead, Icon, Spinner } from '../../components/UI';
-import { DEFAULT_SETTINGS, DEFAULT_PRICING, getPricing } from '../../utils/helpers';
+import { DEFAULT_SETTINGS, DEFAULT_PRICING, getPricing, savePricing } from '../../utils/helpers';
 import AdminOfferEditor from '../../components/AdminOfferEditor';
 import AdminRegionManager from '../../components/AdminRegionManager';
 
@@ -90,11 +90,28 @@ export default function SystemSettings() {
     setForm((prev) => ({ ...prev, [field]: val }));
   };
 
+  const handlePricingFieldChange = (field, val) => {
+    setPricing((prev) => ({
+      ...prev,
+      [field]: val === '' ? '' : val,
+    }));
+  };
+
   const handleSavePricing = async (e) => {
     e?.preventDefault();
     setSavingPricing(true);
     try {
-      await api.savePricing(pricing);
+      const sanitized = {
+        ...pricing,
+        base_distance_km: Math.max(0.5, Number(pricing.base_distance_km) || 5),
+        min_distance_fee: Math.max(0, Number(pricing.min_distance_fee) || 50),
+        extra_per_km: Math.max(0, Number(pricing.extra_per_km) || 12),
+        cancellation_fee: Math.max(0, Number(pricing.cancellation_fee) || 30),
+      };
+      const res = await api.savePricing(sanitized);
+      const updated = res || sanitized;
+      setPricing(updated);
+      savePricing(updated);
       toast('Distance boundary & pricing rates saved to database!', 'success');
     } catch (err) {
       toast(err.message || 'Failed to save pricing rates', 'error');
@@ -329,10 +346,10 @@ export default function SystemSettings() {
                     <span className="input-prefix" style={{ background: '#eff6ff', color: '#2563eb', fontWeight: 700 }}>km</span>
                     <input
                       type="number"
-                      min="1"
+                      min="0.5"
                       step="0.5"
-                      value={pricing.base_distance_km ?? 5}
-                      onChange={(e) => setPricing((p) => ({ ...p, base_distance_km: Math.max(0.5, Number(e.target.value) || 0) }))}
+                      value={pricing.base_distance_km !== undefined ? pricing.base_distance_km : ''}
+                      onChange={(e) => handlePricingFieldChange('base_distance_km', e.target.value)}
                       required
                     />
                   </div>
@@ -347,8 +364,8 @@ export default function SystemSettings() {
                       type="number"
                       min="0"
                       step="1"
-                      value={pricing.min_distance_fee ?? 50}
-                      onChange={(e) => setPricing((p) => ({ ...p, min_distance_fee: Math.max(0, Number(e.target.value) || 0) }))}
+                      value={pricing.min_distance_fee !== undefined ? pricing.min_distance_fee : ''}
+                      onChange={(e) => handlePricingFieldChange('min_distance_fee', e.target.value)}
                       required
                     />
                   </div>
@@ -361,10 +378,10 @@ export default function SystemSettings() {
                     <span className="input-prefix" style={{ background: '#fffbeb', color: '#d97706', fontWeight: 700 }}>₹/km</span>
                     <input
                       type="number"
-                      min="1"
+                      min="0"
                       step="0.5"
-                      value={pricing.extra_per_km ?? 12}
-                      onChange={(e) => setPricing((p) => ({ ...p, extra_per_km: Math.max(0, Number(e.target.value) || 0) }))}
+                      value={pricing.extra_per_km !== undefined ? pricing.extra_per_km : ''}
+                      onChange={(e) => handlePricingFieldChange('extra_per_km', e.target.value)}
                       required
                     />
                   </div>
@@ -442,8 +459,8 @@ export default function SystemSettings() {
                       type="number"
                       min="0"
                       step="1"
-                      value={pricing.cancellation_fee ?? 30}
-                      onChange={(e) => setPricing((p) => ({ ...p, cancellation_fee: Math.max(0, Number(e.target.value) || 0) }))}
+                      value={pricing.cancellation_fee !== undefined ? pricing.cancellation_fee : ''}
+                      onChange={(e) => handlePricingFieldChange('cancellation_fee', e.target.value)}
                       required
                     />
                   </div>

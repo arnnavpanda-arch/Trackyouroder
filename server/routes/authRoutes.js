@@ -52,7 +52,7 @@ router.post('/login', async (req, res) => {
 // @route   POST /api/auth/register
 // @desc    Register a new user
 router.post('/register', async (req, res) => {
-  const { name, email, password, role, phone, state, district } = req.body;
+  const { name, email, password, role, phone, state, district, agentDetails } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({ message: 'Name, email, and password are required' });
@@ -90,6 +90,7 @@ router.post('/register', async (req, res) => {
       }
     }
 
+    const isAgent = role === 'agent';
     const user = await User.create({
       name,
       email: email.toLowerCase(),
@@ -98,6 +99,17 @@ router.post('/register', async (req, res) => {
       phone: phone || '',
       state: (state || '').trim(),
       district: (district || '').trim(),
+      isApproved: !isAgent,
+      approvalStatus: isAgent ? 'pending' : 'approved',
+      agentDetails: isAgent
+        ? {
+            vehicleType: agentDetails?.vehicleType || 'Bike',
+            vehicleNumber: (agentDetails?.vehicleNumber || '').trim(),
+            drivingLicense: (agentDetails?.drivingLicense || '').trim(),
+            emergencyContact: (agentDetails?.emergencyContact || '').trim(),
+            experienceYears: agentDetails?.experienceYears || '',
+          }
+        : undefined,
     });
 
     const token = generateToken(user._id);

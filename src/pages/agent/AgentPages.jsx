@@ -16,7 +16,7 @@ import OrderDetails from '../OrderDetails';
 import ErrorBoundary from '../../components/ErrorBoundary';
 
 export function AgentDeliveries() {
-  const { toast, socket } = useApp();
+  const { user, toast, socket } = useApp();
   const { data, loading, error, reload } = useLiveData(() => api.assignedOrders(), []);
   const [activeOrderId, setActiveOrderId] = useState(null);
   const [busy, setBusy] = useState('');
@@ -28,6 +28,74 @@ export function AgentDeliveries() {
   const [activeGpsOrders, setActiveGpsOrders] = useState({});
   const [orderDistances, setOrderDistances] = useState({});
   const [enablingGpsId, setEnablingGpsId] = useState(null);
+
+  // AGENT APPROVAL CHECK: Show waiting for admin approval if pending
+  if (user?.role === 'agent' && (user?.isApproved === false || user?.approvalStatus === 'pending')) {
+    return (
+      <div className="agent-pending-approval-card" style={{ maxWidth: 680, margin: '40px auto', padding: '36px 28px', background: '#ffffff', borderRadius: 18, border: '1.5px solid #fed7aa', boxShadow: '0 10px 30px rgba(234, 88, 12, 0.08)', textAlign: 'center' }}>
+        <div style={{ width: 72, height: 72, margin: '0 auto 18px', borderRadius: '50%', background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, border: '2px solid #fdba74' }}>
+          ⏳
+        </div>
+        <span style={{ display: 'inline-block', padding: '4px 14px', borderRadius: 20, background: '#fff7ed', color: '#c2410c', fontWeight: 800, fontSize: 12, border: '1px solid #fed7aa', marginBottom: 12 }}>
+          APPLICATION STATUS: WAITING FOR ADMIN APPROVAL
+        </span>
+        <h2 style={{ fontSize: 24, fontWeight: 900, color: '#9a3412', margin: '0 0 10px' }}>
+          Waiting for Admin Approval
+        </h2>
+        <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.6, maxWidth: 520, margin: '0 auto 20px' }}>
+          Hello <strong>{user?.name}</strong>! Your Delivery Agent application has been received and is currently undergoing administrative verification.
+        </p>
+        <div style={{ background: '#f8fafc', padding: '16px 20px', borderRadius: 12, border: '1px solid #e2e8f0', textAlign: 'left', maxWidth: 480, margin: '0 auto 24px' }}>
+          <h4 style={{ margin: '0 0 10px', fontSize: 14, color: '#0f172a', fontWeight: 800 }}>
+            📋 Submitted Profile Details:
+          </h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px', fontSize: 13, color: '#334155' }}>
+            <div><strong>Email:</strong> {user?.email}</div>
+            <div><strong>Phone:</strong> {user?.phone || '—'}</div>
+            <div><strong>Territory:</strong> {user?.district}, {user?.state}</div>
+            <div><strong>Vehicle:</strong> {user?.agentDetails?.vehicleType || 'Bike'}</div>
+            {user?.agentDetails?.vehicleNumber && <div><strong>Reg No:</strong> {user?.agentDetails?.vehicleNumber}</div>}
+            {user?.agentDetails?.drivingLicense && <div><strong>License:</strong> {user?.agentDetails?.drivingLicense}</div>}
+          </div>
+        </div>
+        <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>
+          📧 You will receive an official confirmation email as soon as your account is approved. Once approved, your account will be fully active to accept deliveries.
+        </p>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => window.location.reload()}
+          style={{ padding: '10px 22px', fontWeight: 700 }}
+        >
+          🔄 Check Approval Status
+        </button>
+      </div>
+    );
+  }
+
+  if (user?.role === 'agent' && user?.approvalStatus === 'rejected') {
+    return (
+      <div className="agent-rejected-card" style={{ maxWidth: 640, margin: '40px auto', padding: '36px 28px', background: '#ffffff', borderRadius: 18, border: '1.5px solid #fecaca', boxShadow: '0 10px 30px rgba(220, 38, 38, 0.08)', textAlign: 'center' }}>
+        <div style={{ width: 72, height: 72, margin: '0 auto 18px', borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, border: '2px solid #fca5a5' }}>
+          ❌
+        </div>
+        <span style={{ display: 'inline-block', padding: '4px 14px', borderRadius: 20, background: '#fef2f2', color: '#b91c1c', fontWeight: 800, fontSize: 12, border: '1px solid #fecaca', marginBottom: 12 }}>
+          APPLICATION STATUS: NOT APPROVED
+        </span>
+        <h2 style={{ fontSize: 24, fontWeight: 900, color: '#991b1b', margin: '0 0 10px' }}>
+          Agent Application Not Approved
+        </h2>
+        <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.6, maxWidth: 500, margin: '0 auto 16px' }}>
+          Thank you for applying to Trackora. After reviewing your submitted details, our team could not approve your delivery agent application at this time.
+        </p>
+        {user?.approvalRemarks && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', maxWidth: 460, margin: '0 auto 20px', textAlign: 'left', color: '#7f1d1d', fontSize: 13 }}>
+            <strong>Administrator Remark:</strong> {user?.approvalRemarks}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const handleEnableAgentGps = async (order) => {
     setEnablingGpsId(order.id);

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Icon } from './UI';
+import { encodeOrderSlug } from '../utils/helpers';
 
 export default function Navbar({ onMenu }) {
   const { user, notes, markRead, settings } = useApp();
@@ -32,7 +33,7 @@ export default function Navbar({ onMenu }) {
                 notes.map((n) => (
                   <Link
                     key={n.id}
-                    to={user.role === 'user' ? '/user/orders' : `/${user.role}/orders/${n.orderId}`}
+                    to={user.role === 'user' ? '/user/orders' : `/${user.role}/orders/${encodeOrderSlug(n.orderId)}`}
                     state={user.role === 'user' ? { orderId: n.orderId } : undefined}
                     onClick={() => {
                       if (user.role === 'user') {
