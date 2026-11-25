@@ -19,19 +19,26 @@ const fetchAll = () => Promise.all([api.listOrders(), api.listUsers(), api.getPr
 
 export function AdminDashboard() {
   const { data, loading, error, reload } = useLiveData(fetchAll, []);
-  const { toast, socket } = useApp() || {};
-  const [logo, setLogo] = useState(() => {
-    try {
-      return localStorage.getItem('trackora_custom_logo') || null;
-    } catch {
-      return null;
-    }
-  });
+  const { toast, socket, settings, setSettings } = useApp() || {};
+  const [logo, setLogo] = useState(() => settings?.logo_url || localStorage.getItem('trackora_custom_logo') || null);
   const [pricing, setPricing] = useState(() => getPricing());
   const [savingPricing, setSavingPricing] = useState(false);
   const [simDist, setSimDist] = useState(8);
   const [offer, setOffer] = useState(() => (pricing?.delivery_offer ? { ...DEFAULT_OFFER, ...pricing.delivery_offer } : DEFAULT_OFFER));
   const [savingOffer, setSavingOffer] = useState(false);
+
+  useEffect(() => {
+    if (settings?.logo_url) {
+      setLogo(settings.logo_url);
+    } else {
+      api.getSettings().then((s) => {
+        if (s?.logo_url) {
+          setLogo(s.logo_url);
+          try { localStorage.setItem('trackora_custom_logo', s.logo_url); } catch {}
+        }
+      }).catch(() => {});
+    }
+  }, [settings?.logo_url]);
 
   useEffect(() => {
     if (data && data[2]) {
@@ -122,28 +129,61 @@ export function AdminDashboard() {
   const handleUploadLogo = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) {
-      toast('Please upload an image under 3MB', 'error');
+    if (file.size > 8 * 1024 * 1024) {
+      toast('Please upload an image under 8MB', 'error');
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = reader.result;
-      setLogo(dataUrl);
-      try {
-        localStorage.setItem('trackora_custom_logo', dataUrl);
-        toast('Portal logo uploaded successfully! It is now live on the login page.', 'success');
-      } catch {}
+      const img = new Image();
+      img.onload = async () => {
+        const maxDim = 320;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const optimizedDataUrl = canvas.toDataURL('image/png', 0.9);
+
+        setLogo(optimizedDataUrl);
+        try {
+          localStorage.setItem('trackora_custom_logo', optimizedDataUrl);
+        } catch {}
+
+        try {
+          const updated = await api.saveSettings({ logo_url: optimizedDataUrl });
+          if (setSettings) setSettings((prev) => ({ ...prev, ...updated }));
+          toast('Portal logo uploaded & saved to database! It is now live across all mobile devices & laptops.', 'success');
+        } catch (err) {
+          toast(err.message || 'Saved locally, but failed to sync with database', 'warning');
+        }
+      };
+      img.src = reader.result;
     };
     reader.readAsDataURL(file);
   };
 
-  const handleResetLogo = () => {
+  const handleResetLogo = async () => {
     setLogo(null);
     try {
       localStorage.removeItem('trackora_custom_logo');
-      toast('Custom logo removed. Default Trackora logo restored.', 'info');
-    } catch {}
+      const updated = await api.saveSettings({ logo_url: '' });
+      if (setSettings) setSettings((prev) => ({ ...prev, ...updated }));
+      toast('Custom logo removed. Default Trackora logo restored across all devices.', 'info');
+    } catch (err) {
+      toast(err.message || 'Failed to remove logo from database', 'error');
+    }
   };
 
   if (loading) return <Spinner />;
@@ -340,73 +380,30 @@ export function AdminDashboard() {
             </div>
           </div>
 
-          {/* SECTION 2: WEIGHT TIERS & CANCELLATION FEE */}
-          <h4 style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 800, color: '#334155' }}>
-            ⚖️ Weight Brackets & Cancellation Penalty
-          </h4>
-          <div className="admin-pricing-grid">
-            <div className="pricing-field-box">
-              <label>Under 1 kg Base Rate</label>
-              <div className="input-prefix-wrap">
-                <span className="input-prefix">₹</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={pricing.under_1kg}
-                  onChange={(e) => setPricing((p) => ({ ...p, under_1kg: Math.max(0, Number(e.target.value) || 0) }))}
-                  required
-                />
+          {/* SECTION 2: ORDER CANCELLATION FEE */}
+          <div style={{ background: '#f8fafc', padding: '16px 18px', borderRadius: 12, border: '1.5px solid #e2e8f0', marginBottom: 20 }}>
+            <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>🚫</span> Order Cancellation Fee
+            </h4>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: '#64748b' }}>
+              Standard deduction charged when a customer cancels an unverified order.
+            </p>
+            <div style={{ maxWidth: 360 }}>
+              <div className="pricing-field-box alert-box" style={{ background: '#ffffff', borderColor: '#fca5a5' }}>
+                <label style={{ color: '#b91c1c', fontWeight: 800 }}>Cancel Order Fee (₹)</label>
+                <div className="input-prefix-wrap">
+                  <span className="input-prefix" style={{ background: '#fef2f2', color: '#dc2626', fontWeight: 700 }}>₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={pricing.cancellation_fee ?? 30}
+                    onChange={(e) => setPricing((p) => ({ ...p, cancellation_fee: Math.max(0, Number(e.target.value) || 0) }))}
+                    required
+                  />
+                </div>
+                <span className="pricing-hint">Charged if customer cancels unverified order</span>
               </div>
-              <span className="pricing-hint">Small parcels / pouches (&lt; 1 kg)</span>
-            </div>
-
-            <div className="pricing-field-box">
-              <label>1 kg to 5 kg Fee</label>
-              <div className="input-prefix-wrap">
-                <span className="input-prefix">₹</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={pricing.tier_1_to_5kg}
-                  onChange={(e) => setPricing((p) => ({ ...p, tier_1_to_5kg: Math.max(0, Number(e.target.value) || 0) }))}
-                  required
-                />
-              </div>
-              <span className="pricing-hint">Medium cartons (1 kg - 5 kg)</span>
-            </div>
-
-            <div className="pricing-field-box">
-              <label>5 kg+ Heavy Parcel Fee</label>
-              <div className="input-prefix-wrap">
-                <span className="input-prefix">₹</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={pricing.tier_above_5kg}
-                  onChange={(e) => setPricing((p) => ({ ...p, tier_above_5kg: Math.max(0, Number(e.target.value) || 0) }))}
-                  required
-                />
-              </div>
-              <span className="pricing-hint">Heavy / bulk cargo (&gt; 5 kg)</span>
-            </div>
-
-            <div className="pricing-field-box alert-box">
-              <label>Order Cancellation Fee</label>
-              <div className="input-prefix-wrap">
-                <span className="input-prefix">₹</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={pricing.cancellation_fee}
-                  onChange={(e) => setPricing((p) => ({ ...p, cancellation_fee: Math.max(0, Number(e.target.value) || 0) }))}
-                  required
-                />
-              </div>
-              <span className="pricing-hint">Charged if customer cancels unverified order</span>
             </div>
           </div>
 

@@ -183,6 +183,13 @@ const orderSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    emailsSent: {
+      bookingInvoice: { type: Boolean, default: false },
+      itemValueAdded: { type: Boolean, default: false },
+      paymentVerified: { type: Boolean, default: false },
+      paymentDisputed: { type: Boolean, default: false },
+      delivered: { type: Boolean, default: false },
+    },
   },
   {
     timestamps: true,

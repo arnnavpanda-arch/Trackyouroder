@@ -674,3 +674,219 @@ Support Email: ${settings?.support_email || 'trackoradelivery@gmail.com'}
   }
 }
 
+/**
+ * Generate responsive HTML for Payment Disputed / Not Verified notification
+ */
+export function generatePaymentDisputedHtml(order, recipientEmail, settings = null) {
+  const companyName = settings?.company_name || 'Trackora Logistics Services Pvt. Ltd.';
+  const supportEmail = settings?.support_email || 'trackoradelivery@gmail.com';
+  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5001';
+  const payLink = `${clientOrigin}/user/orders/${order.id}`;
+  const totalDue = Number(order.totalPayable || ((order.deliveryFee || 40) + (order.itemValue || 0))).toFixed(2);
+  const reason = order.verificationNote || 'Submitted payment details / UTR ID could not be verified by the delivery agent.';
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Verification Notice - Order #${order.id}</title>
+</head>
+<body style="margin:0; padding:20px; background-color:#f8fafc; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#1e293b;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; margin:0 auto; background:#ffffff; border-radius:14px; border:1.5px solid #fecaca; box-shadow:0 4px 14px rgba(220,38,38,0.08); overflow:hidden;">
+    <tr>
+      <td style="background:linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); padding:28px 24px; text-align:center; color:#ffffff;">
+        <div style="font-size:36px; margin-bottom:8px;">⚠️</div>
+        <h1 style="margin:0; font-size:22px; font-weight:800; letter-spacing:-0.02em;">Payment Not Verified</h1>
+        <p style="margin:6px 0 0; font-size:14px; opacity:0.95;">Action Required for Order #${order.id}</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:28px 24px;">
+        <p style="margin:0 0 16px; font-size:15px; line-height:1.6;">
+          Hello <b>${order.userName || 'Customer'}</b>,
+        </p>
+        <p style="margin:0 0 20px; font-size:14px; line-height:1.6; color:#475569;">
+          Your delivery agent reviewed the payment details submitted for Order <b>#${order.id}</b>, but was unable to verify the transaction.
+        </p>
+
+        <div style="background:#fef2f2; border:1.5px solid #fca5a5; border-radius:10px; padding:16px 18px; margin-bottom:24px;">
+          <div style="font-size:13px; font-weight:800; color:#991b1b; margin-bottom:6px;">⚠️ REASON / AGENT NOTE:</div>
+          <div style="font-size:14px; color:#7f1d1d; line-height:1.5; font-weight:600;">
+            ${reason}
+          </div>
+          <div style="margin-top:12px; padding-top:10px; border-top:1px dashed #f87171; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:13px; color:#991b1b; font-weight:700;">Outstanding Amount Due:</span>
+            <span style="font-size:18px; font-weight:900; color:#b91c1c;">₹${totalDue}</span>
+          </div>
+        </div>
+
+        <p style="margin:0 0 24px; font-size:14px; line-height:1.6; color:#475569;">
+          Please settle the fee online via PhonePe UPI / Card or submit a valid UTR ID so your package can proceed without delay.
+        </p>
+
+        <div style="text-align:center; margin:28px 0;">
+          <a href="${payLink}" target="_blank" rel="noreferrer" style="display:inline-block; background:#dc2626; color:#ffffff; font-weight:800; font-size:15px; padding:14px 32px; border-radius:10px; text-decoration:none; box-shadow:0 4px 12px rgba(220,38,38,0.35);">
+            💳 Settle Payment / Resubmit UTR Online
+          </a>
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 16px; margin-top:24px; font-size:12px; color:#64748b;">
+          <b>Consignment:</b> ${order.desc || order.pkg?.type || 'Standard Delivery'} · <b>Drop:</b> ${order.drop?.address || 'Customer destination'}<br />
+          Need assistance? Reply to this email or reach us at <a href="mailto:${supportEmail}" style="color:#2563eb;">${supportEmail}</a>.
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f1f5f9; padding:16px 24px; text-align:center; font-size:12px; color:#64748b; border-top:1px solid #e2e8f0;">
+        © ${new Date().getFullYear()} ${companyName}. All rights reserved.
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
+
+/**
+ * Send official Payment Verified & Confirmed confirmation email with Tax Invoice PDF
+ */
+export async function sendPaymentVerifiedEmail(order, userEmail, userName) {
+  const targetEmail = (userEmail || order.userEmail || '').trim();
+  if (!targetEmail || !targetEmail.includes('@')) {
+    console.warn(`[Email] Cannot send verified payment email: No valid email for order ${order.id}`);
+    return { ok: false, error: 'No valid recipient email address' };
+  }
+
+  let settings = null;
+  try {
+    settings = await Settings.findOne();
+  } catch (err) {}
+
+  const companyName = settings?.company_name || 'Trackora Logistics Services Pvt. Ltd.';
+  const senderEmail = (process.env.EMAIL_USER || 'trackoradelivery@gmail.com').trim();
+  const fromHeader = process.env.EMAIL_FROM || `"${companyName}" <${senderEmail}>`;
+  const subject = `✓ Payment Verified & Approved for Order #${order.id} | ${companyName}`;
+  const html = generateTaxInvoiceHtml(order, targetEmail, settings);
+  const totalAmount = Number(order.totalPayable || ((order.deliveryFee || 40) + (order.itemValue || 0))).toFixed(2);
+
+  const text = `
+PAYMENT VERIFIED & APPROVED - ${companyName.toUpperCase()}
+==================================================
+Hello ${userName || order.userName || 'Customer'},
+
+Good news! Your payment for Order #${order.id} has been verified and approved by the delivery partner.
+
+Payment Summary:
+- Order ID: #${order.id}
+- Total Amount Verified: INR ${totalAmount}
+- Payment Status: PAID & VERIFIED
+- Transaction Ref / UTR: ${order.txnId || order.utrId || 'Online Payment'}
+- Delivery Address: ${order.drop?.address || 'N/A'}
+
+Your official Tax Invoice PDF is attached to this email.
+Track your parcel: ${process.env.CLIENT_ORIGIN || 'http://localhost:5001'}/user/orders/${order.id}
+Support: ${settings?.support_email || 'trackoradelivery@gmail.com'}
+==================================================
+  `;
+
+  try {
+    let pdfBuffer = null;
+    try {
+      pdfBuffer = await generateInvoicePdfBuffer(order, targetEmail);
+    } catch (pdfErr) {
+      console.warn(`[Email Warning] Could not attach PDF to verified email:`, pdfErr.message);
+    }
+
+    const attachments = [];
+    if (pdfBuffer) {
+      attachments.push({
+        filename: `Tax_Invoice_${order.id}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      });
+    }
+
+    const transporter = createMailTransporter();
+    console.log(`[Email] Sending payment verified email for order #${order.id} to ${targetEmail}...`);
+
+    const info = await transporter.sendMail({
+      from: fromHeader,
+      to: targetEmail,
+      subject,
+      text,
+      html,
+      attachments,
+    });
+
+    console.log(`[Email] Payment verified email sent successfully! MessageId: ${info.messageId} to ${targetEmail}`);
+    return { ok: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Email Error] Failed to send payment verified email for #${order.id}:`, err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * Send Payment Disputed / Not Verified notification email
+ */
+export async function sendPaymentDisputedEmail(order, userEmail, userName) {
+  const targetEmail = (userEmail || order.userEmail || '').trim();
+  if (!targetEmail || !targetEmail.includes('@')) {
+    console.warn(`[Email] Cannot send payment disputed email: No valid email for order ${order.id}`);
+    return { ok: false, error: 'No valid recipient email address' };
+  }
+
+  let settings = null;
+  try {
+    settings = await Settings.findOne();
+  } catch (err) {}
+
+  const companyName = settings?.company_name || 'Trackora Logistics Services Pvt. Ltd.';
+  const senderEmail = (process.env.EMAIL_USER || 'trackoradelivery@gmail.com').trim();
+  const fromHeader = process.env.EMAIL_FROM || `"${companyName}" <${senderEmail}>`;
+  const subject = `⚠️ Action Required: Payment Not Verified for Order #${order.id} | ${companyName}`;
+  const html = generatePaymentDisputedHtml(order, targetEmail, settings);
+  const totalAmount = Number(order.totalPayable || ((order.deliveryFee || 40) + (order.itemValue || 0))).toFixed(2);
+  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5001';
+
+  const text = `
+PAYMENT NOT VERIFIED - ACTION REQUIRED
+==================================================
+Hello ${userName || order.userName || 'Customer'},
+
+The delivery agent reviewed your payment details for Order #${order.id}, but was unable to verify the transaction.
+
+Reason / Agent Note:
+${order.verificationNote || 'Submitted payment details / UTR ID could not be verified.'}
+
+Outstanding Amount Due: INR ${totalAmount}
+
+Please pay the outstanding fee online or submit a valid UTR ID:
+${clientOrigin}/user/orders/${order.id}
+
+Support: ${settings?.support_email || 'trackoradelivery@gmail.com'}
+==================================================
+  `;
+
+  try {
+    const transporter = createMailTransporter();
+    console.log(`[Email] Sending payment disputed email for order #${order.id} to ${targetEmail}...`);
+
+    const info = await transporter.sendMail({
+      from: fromHeader,
+      to: targetEmail,
+      subject,
+      text,
+      html,
+    });
+
+    console.log(`[Email] Payment disputed email sent successfully! MessageId: ${info.messageId} to ${targetEmail}`);
+    return { ok: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Email Error] Failed to send payment disputed email for #${order.id}:`, err.message);
+    return { ok: false, error: err.message };
+  }
+}
+

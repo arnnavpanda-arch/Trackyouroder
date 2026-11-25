@@ -6,7 +6,12 @@ import { getNextOrderId } from '../models/Sequence.js';
 import { protect, agentOrAdmin } from '../middleware/auth.js';
 import { getIO } from '../socket.js';
 import { geocodeAddress, reverseGeocode, parseMapLinkOrAddress } from '../utils/geocoder.js';
-import { sendBookingInvoiceEmail, sendOrderDeliveredEmail } from '../utils/emailService.js';
+import {
+  sendBookingInvoiceEmail,
+  sendOrderDeliveredEmail,
+  sendPaymentVerifiedEmail,
+  sendPaymentDisputedEmail,
+} from '../utils/emailService.js';
 import { generateInvoicePdfBuffer } from '../utils/invoicePdf.js';
 
 const router = express.Router();
@@ -307,11 +312,14 @@ router.post('/', protect, async (req, res) => {
     }
     notify('admin', `New order ${order.id} placed by ${req.user.name} (Fee: ₹${fee})`, order.id);
 
-    // Automatically send official Tax Invoice with PDF to customer's registered email
-    if (recipientEmail) {
+    // Automatically send official Tax Invoice with PDF to customer's registered email (only once upon booking)
+    if (recipientEmail && !order.emailsSent?.bookingInvoice) {
       (async () => {
         try {
-          await sendBookingInvoiceEmail(order.toJSON(), recipientEmail, req.user.name);
+          const res = await sendBookingInvoiceEmail(order.toJSON(), recipientEmail, req.user.name);
+          if (res?.ok) {
+            await Order.updateOne({ _id: order._id }, { $set: { 'emailsSent.bookingInvoice': true } });
+          }
           console.log(`[Email] Automatic booking tax invoice PDF sent to ${recipientEmail} for order #${order.id}`);
         } catch (emailErr) {
           console.error('[Email Error] Failed sending automatic booking tax invoice:', emailErr.message);
@@ -498,28 +506,32 @@ router.patch('/:id/status', protect, agentOrAdmin, async (req, res) => {
       order.agentLoc = null;
       // Note: rating is left for the customer/user to provide, NOT automatically set by agent
 
-      // Send delivered confirmation email with Thank You & Order Again CTA to registered email
-      (async () => {
-        try {
-          let customerEmail = order.userEmail;
-          let customerName = order.userName;
-          if (!customerEmail && order.userId) {
-            const u = await User.findById(order.userId);
-            if (u) {
-              customerEmail = u.email;
-              customerName = u.name;
+      // Send delivered confirmation email with Thank You & Order Again CTA to registered email (only once upon delivery)
+      if (!order.emailsSent?.delivered) {
+        order.emailsSent = order.emailsSent || {};
+        order.emailsSent.delivered = true;
+        (async () => {
+          try {
+            let customerEmail = order.userEmail;
+            let customerName = order.userName;
+            if (!customerEmail && order.userId) {
+              const u = await User.findById(order.userId);
+              if (u) {
+                customerEmail = u.email;
+                customerName = u.name;
+              }
             }
+            if (customerEmail) {
+              console.log(`[Order Status] Order ${order.id} is Delivered. Sending confirmation email to ${customerEmail}...`);
+              await sendOrderDeliveredEmail(order, customerEmail, customerName);
+            } else {
+              console.warn(`[Order Status] No customer email found for delivered order ${order.id}`);
+            }
+          } catch (mailErr) {
+            console.error(`[Order Status] Error sending delivered email for ${order.id}:`, mailErr.message);
           }
-          if (customerEmail) {
-            console.log(`[Order Status] Order ${order.id} is Delivered. Sending confirmation email to ${customerEmail}...`);
-            await sendOrderDeliveredEmail(order, customerEmail, customerName);
-          } else {
-            console.warn(`[Order Status] No customer email found for delivered order ${order.id}`);
-          }
-        } catch (mailErr) {
-          console.error(`[Order Status] Error sending delivered email for ${order.id}:`, mailErr.message);
-        }
-      })();
+        })();
+      }
     }
 
     await order.save();
@@ -699,23 +711,49 @@ router.patch('/:id/payment-verification', protect, agentOrAdmin, async (req, res
       order.id
     );
 
-    // Send verified Tax Invoice with PDF to customer's registered email
+    // Send verified or disputed email to customer's registered email (deduplicated)
     if (verified) {
-      (async () => {
-        try {
-          let email = order.userEmail;
-          if (!email && order.userId) {
-            const customer = await User.findById(order.userId);
-            if (customer) email = customer.email;
+      if (!order.emailsSent?.paymentVerified) {
+        order.emailsSent = order.emailsSent || {};
+        order.emailsSent.paymentVerified = true;
+        await Order.updateOne({ _id: order._id }, { $set: { 'emailsSent.paymentVerified': true } });
+        (async () => {
+          try {
+            let email = order.userEmail;
+            if (!email && order.userId) {
+              const customer = await User.findById(order.userId);
+              if (customer) email = customer.email;
+            }
+            if (email) {
+              await sendPaymentVerifiedEmail(order.toJSON(), email, order.userName);
+              console.log(`[Email] Verified payment confirmation email sent to ${email} for order #${order.id}`);
+            }
+          } catch (emailErr) {
+            console.error('[Email Error] Failed sending verified invoice:', emailErr.message);
           }
-          if (email) {
-            await sendBookingInvoiceEmail(order.toJSON(), email, order.userName);
-            console.log(`[Email] Verified invoice sent to customer ${email} for order #${order.id}`);
+        })();
+      }
+    } else {
+      if (!order.emailsSent?.paymentDisputed) {
+        order.emailsSent = order.emailsSent || {};
+        order.emailsSent.paymentDisputed = true;
+        await Order.updateOne({ _id: order._id }, { $set: { 'emailsSent.paymentDisputed': true } });
+        (async () => {
+          try {
+            let email = order.userEmail;
+            if (!email && order.userId) {
+              const customer = await User.findById(order.userId);
+              if (customer) email = customer.email;
+            }
+            if (email) {
+              await sendPaymentDisputedEmail(order.toJSON(), email, order.userName);
+              console.log(`[Email] Payment disputed / not verified notice sent to ${email} for order #${order.id}`);
+            }
+          } catch (emailErr) {
+            console.error('[Email Error] Failed sending payment disputed email:', emailErr.message);
           }
-        } catch (emailErr) {
-          console.error('[Email Error] Failed sending verified invoice:', emailErr.message);
-        }
-      })();
+        })();
+      }
     }
 
     return res.json(order.toJSON());
@@ -747,22 +785,28 @@ router.patch('/:id/item-value', protect, agentOrAdmin, async (req, res) => {
     );
     notify('admin', `Agent updated item value for order ${order.id}: ₹${order.itemValue}`, order.id);
 
-    // If customer has not paid the bill, send updated bill with PDF to customer's registered email
-    (async () => {
-      try {
-        let email = order.userEmail;
-        if (!email && order.userId) {
-          const customer = await User.findById(order.userId);
-          if (customer) email = customer.email;
+    // If customer has NOT paid the bill, send updated bill with PDF to customer's registered email (only once upon item value addition)
+    const isCustomerPaid = order.itemPaid || order.paymentStatus === 'paid' || order.paymentStatus === 'verified';
+    if (!isCustomerPaid && !order.emailsSent?.itemValueAdded) {
+      order.emailsSent = order.emailsSent || {};
+      order.emailsSent.itemValueAdded = true;
+      await Order.updateOne({ _id: order._id }, { $set: { 'emailsSent.itemValueAdded': true } });
+      (async () => {
+        try {
+          let email = order.userEmail;
+          if (!email && order.userId) {
+            const customer = await User.findById(order.userId);
+            if (customer) email = customer.email;
+          }
+          if (email) {
+            await sendBookingInvoiceEmail(order.toJSON(), email, order.userName);
+            console.log(`[Email] Updated item bill sent to customer ${email} for order #${order.id}`);
+          }
+        } catch (emailErr) {
+          console.error('[Email Error] Failed sending item price invoice:', emailErr.message);
         }
-        if (email) {
-          await sendBookingInvoiceEmail(order.toJSON(), email, order.userName);
-          console.log(`[Email] Updated item bill sent to customer ${email} for order #${order.id}`);
-        }
-      } catch (emailErr) {
-        console.error('[Email Error] Failed sending item price invoice:', emailErr.message);
-      }
-    })();
+      })();
+    }
 
     return res.json(order.toJSON());
   } catch (err) {
@@ -784,6 +828,9 @@ router.patch('/:id/resubmit-payment', protect, async (req, res) => {
     order.payerName = payerName;
     order.accountHolderName = payerName;
     order.paymentStatus = 'pending_verification';
+    order.emailsSent = order.emailsSent || {};
+    order.emailsSent.paymentDisputed = false;
+    order.emailsSent.paymentVerified = false;
 
     await order.save();
     emitOrderUpdate(order.id, order);
@@ -855,22 +902,27 @@ router.post('/:id/collect-payment', protect, async (req, res) => {
     notify('admin', `Payment of ₹${collectedAmt} collected for order ${order.id}`, order.id);
     if (order.agentId) notify(order.agentId, `Payment of ₹${collectedAmt} confirmed for order ${order.id}`, order.id);
 
-    // Send official Paid Tax Invoice with PDF to customer
-    (async () => {
-      try {
-        let email = order.userEmail;
-        if (!email && order.userId) {
-          const customer = await User.findById(order.userId);
-          if (customer) email = customer.email;
+    // Send official Paid Tax Invoice with PDF to customer (only if not already sent)
+    if (!order.emailsSent?.paymentVerified) {
+      order.emailsSent = order.emailsSent || {};
+      order.emailsSent.paymentVerified = true;
+      await Order.updateOne({ _id: order._id }, { $set: { 'emailsSent.paymentVerified': true } });
+      (async () => {
+        try {
+          let email = order.userEmail;
+          if (!email && order.userId) {
+            const customer = await User.findById(order.userId);
+            if (customer) email = customer.email;
+          }
+          if (email) {
+            await sendPaymentVerifiedEmail(order.toJSON(), email, order.userName);
+            console.log(`[Email] Paid invoice sent to customer ${email} for order #${order.id}`);
+          }
+        } catch (emailErr) {
+          console.error('[Email Error] Failed sending paid invoice:', emailErr.message);
         }
-        if (email) {
-          await sendBookingInvoiceEmail(order.toJSON(), email, order.userName);
-          console.log(`[Email] Paid invoice sent to customer ${email} for order #${order.id}`);
-        }
-      } catch (emailErr) {
-        console.error('[Email Error] Failed sending paid invoice:', emailErr.message);
-      }
-    })();
+      })();
+    }
 
     return res.json(order.toJSON());
   } catch (err) {

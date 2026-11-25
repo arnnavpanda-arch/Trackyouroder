@@ -586,11 +586,11 @@ export function PlaceOrder() {
         )}
 
         {/* Intra-State Policy Callout Banner */}
-        <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 12, padding: '14px 18px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ fontSize: 26, background: '#dcfce7', width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div className="policy-callout-banner" style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 12, padding: '14px 18px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div className="policy-callout-icon" style={{ fontSize: 26, background: '#dcfce7', width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             🔒
           </div>
-          <div>
+          <div className="policy-callout-text">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <b style={{ color: '#166534', fontSize: 14.5 }}>Intra-State Delivery Rule (Mandatory Policy)</b>
               <span style={{ background: '#16a34a', color: '#fff', fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 10 }}>
@@ -827,7 +827,7 @@ export function PlaceOrder() {
                   </span>
                 )}
               </label>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div className="map-link-input-row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input
                   type="text"
                   value={dropMapLink}
@@ -892,7 +892,7 @@ export function PlaceOrder() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
+          <div className="distance-breakdown-tiles" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
             <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
               <small style={{ color: '#64748b', fontSize: 11.5, display: 'block' }}>📏 Trip Distance</small>
               <b style={{ fontSize: 16, color: '#0f172a' }}>{calculatedDistanceKm} km</b>
@@ -1034,7 +1034,7 @@ export function PlaceOrder() {
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 14 }}>
+          <div className="item-paid-toggle-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 14 }}>
             {/* OPTION A: Item Already Paid */}
             <div
               onClick={() => {
@@ -1567,28 +1567,45 @@ export function MyOrders() {
             </span>
           )}
           {o.status !== 'Cancelled' && o.paymentStatus !== 'verified' && o.paymentStatus !== 'paid' && o.itemValue > 0 && (
-            <button
-              type="button"
-              className="btn sm"
-              style={{
-                background: '#5f259f',
-                color: '#fff',
-                fontSize: 11.5,
-                fontWeight: 800,
-                padding: '3px 8px',
-                borderRadius: 6,
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(95, 37, 159, 0.3)',
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setRepayingOrder(o);
-              }}
-              title={`Agent added item price. Pay total bill of ₹${o.totalPayable} online now`}
-            >
-              💳 Pay Total (₹{o.totalPayable})
-            </button>
+            (!o.itemPaid && !o.utrId && !o.txnId && o.paymentStatus !== 'pending_agent_verification' && o.paymentStatus !== 'pending_verification') ? (
+              <button
+                type="button"
+                className="btn sm"
+                style={{
+                  background: '#5f259f',
+                  color: '#fff',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(95, 37, 159, 0.3)',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRepayingOrder(o);
+                }}
+                title={`Agent added item price. Pay total bill of ₹${o.totalPayable} online now`}
+              >
+                💳 Pay Total (₹{o.totalPayable})
+              </button>
+            ) : (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: '#15803d',
+                  background: '#ecfdf5',
+                  padding: '2px 7px',
+                  borderRadius: 4,
+                  border: '1px solid #86efac',
+                }}
+                title="Payment submitted and recorded across devices; awaiting agent confirmation"
+              >
+                ⏳ Paid (Verifying)
+              </span>
+            )
           )}
           {o.status !== 'Cancelled' && (o.paymentStatus === 'not_verified' || o.agentDisputed) && !o.itemValue && (
             <button

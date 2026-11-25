@@ -49,6 +49,7 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
   const [busyDelete, setBusyDelete] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const [showQuickBill, setShowQuickBill] = useState(false);
+  const [showFullId, setShowFullId] = useState(false);
 
   const share = useGeoShare(id, socket, order);
 
@@ -432,6 +433,26 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
     order.totalPayable || ((order.deliveryFee || 40) + (order.itemValue || 0))
   ).toFixed(2);
 
+  // Robust cross-device payment settlement status
+  const isPaidOrVerified =
+    order.paymentStatus === 'paid' ||
+    order.paymentStatus === 'verified';
+
+  const isPendingVerification =
+    !isPaidOrVerified &&
+    (order.paymentStatus === 'pending_agent_verification' ||
+      order.paymentStatus === 'pending_verification' ||
+      Boolean(order.itemPaid && !order.agentDisputed && order.paymentStatus !== 'not_verified') ||
+      Boolean(order.utrId || order.txnId));
+
+  const isDisputed =
+    order.paymentStatus === 'not_verified' ||
+    Boolean(order.agentDisputed);
+
+  const maskedDisplayId = order?.id
+    ? (order.id.length > 4 ? `DL••••${order.id.slice(-2)}` : `••••${order.id}`)
+    : '••••';
+
   return (
     <div className="trk-page">
       {/* Top Navigation Bar */}
@@ -440,8 +461,22 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
           <span>←</span> Back to Orders
         </button>
         <div className="trk-nav-meta">
-          <button type="button" onClick={handleCopyId} className="trk-copy-id-chip" title="Click to copy tracking ID">
-            <span>📋</span> {order.id} {copiedId ? '✓ Copied' : ''}
+          <button
+            type="button"
+            onClick={handleCopyId}
+            className="trk-copy-id-chip"
+            title="Click to copy tracking ID"
+          >
+            <span>🔒</span> {copiedId ? '✓ Copied ID' : (showFullId ? order.id : `ID: ${maskedDisplayId}`)}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowFullId(!showFullId)}
+            className="trk-btn trk-btn-outline"
+            style={{ padding: '4px 8px', fontSize: '0.72rem', borderRadius: 8, height: 28, cursor: 'pointer' }}
+            title={showFullId ? 'Mask order ID for security' : 'Reveal full order ID'}
+          >
+            {showFullId ? '🙈 Hide' : '👁️ View'}
           </button>
           <StatusBadge status={order.status} />
         </div>
@@ -450,9 +485,24 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
       {/* Header Info Card */}
       <div className="trk-header-card">
         <div className="trk-header-left">
-          <h1>
-            Order #{order.id}
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <h1 style={{ margin: 0 }}>
+              {showFullId ? `Order #${order.id}` : `Order #${maskedDisplayId}`}
+            </h1>
+            <button
+              type="button"
+              onClick={() => setShowFullId(!showFullId)}
+              className="trk-btn trk-btn-outline"
+              style={{ padding: '3px 8px', fontSize: '0.74rem', borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              title={showFullId ? 'Mask order ID for security' : 'Reveal full order ID'}
+            >
+              <span>{showFullId ? '🙈' : '👁️'}</span>
+              <span>{showFullId ? 'Mask ID' : 'Show ID'}</span>
+            </button>
+            <span style={{ fontSize: '0.72rem', color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
+              🔒 Protected Tracking
+            </span>
+          </div>
           <p className="trk-header-sub">
             <span>Placed {fmtDate(order.createdAt)}</span>
             <span>•</span>
@@ -690,25 +740,29 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
                     fontWeight: 800,
                     padding: '4px 10px',
                     borderRadius: '20px',
-                    background:
-                      order.paymentStatus === 'verified' || order.paymentStatus === 'paid'
-                        ? '#dcfce7'
-                        : order.paymentStatus === 'not_verified' || order.agentDisputed
-                        ? '#fee2e2'
-                        : '#f3e8ff',
-                    color:
-                      order.paymentStatus === 'verified' || order.paymentStatus === 'paid'
-                        ? '#15803d'
-                        : order.paymentStatus === 'not_verified' || order.agentDisputed
-                        ? '#991b1b'
-                        : '#6b21a8',
+                    background: isPaidOrVerified
+                      ? '#dcfce7'
+                      : isDisputed
+                      ? '#fee2e2'
+                      : isPendingVerification
+                      ? '#fef3c7'
+                      : '#f3e8ff',
+                    color: isPaidOrVerified
+                      ? '#15803d'
+                      : isDisputed
+                      ? '#991b1b'
+                      : isPendingVerification
+                      ? '#b45309'
+                      : '#6b21a8',
                   }}
                 >
-                  {order.paymentStatus === 'verified' || order.paymentStatus === 'paid'
+                  {isPaidOrVerified
                     ? '✓ PAID & VERIFIED'
-                    : order.paymentStatus === 'not_verified' || order.agentDisputed
+                    : isDisputed
                     ? '⚠️ VERIFICATION REQUIRED'
-                    : 'PENDING VERIFICATION'}
+                    : isPendingVerification
+                    ? '⏳ PAYMENT RECORDED (VERIFYING)'
+                    : '💵 CASH ON DELIVERY / PENDING'}
                 </span>
               </div>
             </div>
@@ -725,17 +779,27 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
                   </p>
                 </div>
               </div>
-            ) : order.paymentStatus === 'verified' || order.paymentStatus === 'paid' ? (
+            ) : isPaidOrVerified ? (
               <div className="trk-pay-banner verified">
                 <span className="trk-pay-icon">✅</span>
                 <div className="trk-pay-info">
-                  <h4>Tax Invoice Ready</h4>
+                  <h4>Payment Confirmed & Verified</h4>
                   <p>
-                    Your payment of <b>₹{totalBillAmount}</b> is verified. Official tax invoice with PDF has been sent to your email.
+                    Your payment of <b>₹{totalBillAmount}</b> is verified across all devices. Official tax invoice with PDF is available for download below.
                   </p>
                 </div>
               </div>
-            ) : order.paymentStatus === 'not_verified' || order.agentDisputed ? (
+            ) : isPendingVerification ? (
+              <div className="trk-pay-banner" style={{ background: '#fefce8', borderColor: '#fef08a' }}>
+                <span className="trk-pay-icon">⏳</span>
+                <div className="trk-pay-info">
+                  <h4 style={{ color: '#854d0e' }}>Payment Recorded (Verification in Progress)</h4>
+                  <p style={{ color: '#713f12' }}>
+                    Payment of <b>₹{totalBillAmount}</b> was submitted ({order.txnId || order.utrId ? `Ref: ${order.txnId || order.utrId}` : `Method: ${order.paymentMethod || 'Online'}`}). Delivery partner is cross-verifying. <b>You do not need to pay again.</b>
+                  </p>
+                </div>
+              </div>
+            ) : isDisputed ? (
               <div className="trk-pay-banner dispute">
                 <span className="trk-pay-icon">⚠️</span>
                 <div className="trk-pay-info">
@@ -813,7 +877,7 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
                 <div className="trk-quick-bill-box">
                   <div className="trk-quick-bill-row">
                     <span>Order Tracking ID:</span>
-                    <strong>#{order.id}</strong>
+                    <strong>{showFullId ? `#${order.id}` : `#${maskedDisplayId}`}</strong>
                   </div>
                   <div className="trk-quick-bill-row">
                     <span>Customer Name:</span>
@@ -869,9 +933,9 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
               {/* Call to Action Buttons */}
               {user?.role === 'user' && order.status !== 'Cancelled' && (
                 <>
-                  {order.paymentStatus === 'paid' || order.paymentStatus === 'verified' ? (
+                  {isPaidOrVerified ? (
                     <a
-                      href={`http://localhost:5001/api/orders/${order.id}/invoice-pdf`}
+                      href={`/api/orders/${order.id}/invoice-pdf`}
                       target="_blank"
                       rel="noreferrer"
                       download={`Tax_Invoice_${order.id}.pdf`}
@@ -880,7 +944,16 @@ export default function OrderDetails({ orderId: propOrderId, onBack }) {
                     >
                       <span>📥</span> Download Tax Invoice (PDF)
                     </a>
-                  ) : order.paymentStatus === 'not_verified' || order.agentDisputed ? (
+                  ) : isPendingVerification ? (
+                    <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10, padding: '12px 14px', textAlign: 'center' }}>
+                      <div style={{ color: '#166534', fontWeight: 800, fontSize: '0.88rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <span>✓</span> Payment Recorded on System
+                      </div>
+                      <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#15803d', lineHeight: 1.4 }}>
+                        Payment was completed and synced across your devices. No further payment action is needed from you.
+                      </p>
+                    </div>
+                  ) : isDisputed ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <button
                         type="button"

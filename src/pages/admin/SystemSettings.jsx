@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { PageHead, Icon, Spinner } from '../../components/UI';
-import { DEFAULT_SETTINGS } from '../../utils/helpers';
+import { DEFAULT_SETTINGS, DEFAULT_PRICING, getPricing } from '../../utils/helpers';
 import AdminOfferEditor from '../../components/AdminOfferEditor';
 import AdminRegionManager from '../../components/AdminRegionManager';
 
@@ -53,9 +53,13 @@ export default function SystemSettings() {
   const location = useLocation();
   const { toast, setSettings } = useApp();
   const [form, setForm] = useState(DEFAULT_SETTINGS);
+  const [pricing, setPricing] = useState(() => getPricing());
+  const [savingPricing, setSavingPricing] = useState(false);
+  const [simDist, setSimDist] = useState(8);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
+    if (location?.pathname?.includes('/pricing')) return 'pricing';
     if (location?.pathname?.includes('/regions')) return 'regions';
     if (location?.pathname?.includes('/offers')) return 'offers';
     return 'regions'; // Default to Serviceable States & Districts
@@ -64,10 +68,16 @@ export default function SystemSettings() {
 
   useEffect(() => {
     setLoading(true);
-    api.getSettings()
-      .then((data) => {
-        if (data) {
-          setForm((prev) => ({ ...DEFAULT_SETTINGS, ...data }));
+    Promise.all([
+      api.getSettings().catch(() => null),
+      api.getPricing().catch(() => null),
+    ])
+      .then(([settingsData, pricingData]) => {
+        if (settingsData) {
+          setForm((prev) => ({ ...DEFAULT_SETTINGS, ...settingsData }));
+        }
+        if (pricingData) {
+          setPricing((prev) => ({ ...DEFAULT_PRICING, ...pricingData }));
         }
       })
       .catch(() => {
@@ -80,6 +90,19 @@ export default function SystemSettings() {
     setForm((prev) => ({ ...prev, [field]: val }));
   };
 
+  const handleSavePricing = async (e) => {
+    e?.preventDefault();
+    setSavingPricing(true);
+    try {
+      await api.savePricing(pricing);
+      toast('Distance boundary & pricing rates saved to database!', 'success');
+    } catch (err) {
+      toast(err.message || 'Failed to save pricing rates', 'error');
+    } finally {
+      setSavingPricing(false);
+    }
+  };
+
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -90,7 +113,7 @@ export default function SystemSettings() {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         // Optimize logo resolution to max 320x320 for lightning-fast database storage & mobile loading
         const maxDim = 320;
         let w = img.width;
@@ -115,27 +138,39 @@ export default function SystemSettings() {
         try {
           localStorage.setItem('trackora_custom_logo', optimizedDataUrl);
         } catch {}
-        toast('Logo ready! Click "Save Settings" below to save to the database & apply to all devices.', 'info');
+
+        try {
+          const updated = await api.saveSettings({ ...form, logo_url: optimizedDataUrl });
+          if (setSettings) setSettings((prev) => ({ ...prev, ...updated }));
+          toast('Portal logo uploaded & saved to database! It is now live across all mobile devices & laptops.', 'success');
+        } catch (err) {
+          toast(err.message || 'Saved locally, but failed to sync with database', 'warning');
+        }
       };
       img.onerror = () => {
         const rawDataUrl = reader.result;
         handleChange('logo_url', rawDataUrl);
         try {
           localStorage.setItem('trackora_custom_logo', rawDataUrl);
+          api.saveSettings({ ...form, logo_url: rawDataUrl }).then((updated) => {
+            if (setSettings) setSettings((prev) => ({ ...prev, ...updated }));
+          }).catch(() => {});
         } catch {}
-        toast('Logo ready! Click "Save Settings" below to save to database.', 'info');
+        toast('Logo uploaded! Applied to all devices.', 'success');
       };
       img.src = reader.result;
     };
     reader.readAsDataURL(file);
   };
 
-  const handleRemoveLogo = () => {
+  const handleRemoveLogo = async () => {
     handleChange('logo_url', '');
     try {
       localStorage.removeItem('trackora_custom_logo');
+      const updated = await api.saveSettings({ ...form, logo_url: '' });
+      if (setSettings) setSettings((prev) => ({ ...prev, ...updated }));
     } catch {}
-    toast('Custom logo removed. Default branding will be used.', 'info');
+    toast('Custom logo removed. Default branding restored across all devices.', 'info');
   };
 
   const handleSave = async (e) => {
@@ -202,6 +237,14 @@ export default function SystemSettings() {
       <div className="settings-nav-tabs">
         <button
           type="button"
+          className={`tab-btn ${activeTab === 'pricing' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('pricing'); setPreviewMode(false); }}
+        >
+          <span style={{ fontSize: 16 }}>⚡</span>
+          Distance Boundary & Fee Rates
+        </button>
+        <button
+          type="button"
           className={`tab-btn ${activeTab === 'regions' ? 'active' : ''}`}
           onClick={() => { setActiveTab('regions'); setPreviewMode(false); }}
         >
@@ -241,6 +284,182 @@ export default function SystemSettings() {
           Terms & Conditions
         </button>
       </div>
+
+      {activeTab === 'pricing' && (
+        <div className="card admin-pricing-card" style={{ borderRadius: 16, marginBottom: 18 }}>
+          <div className="admin-pricing-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 16, marginBottom: 18 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: '1.4rem' }}>⚡</span>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
+                  Delivery Distance Boundary & Fee Configuration
+                </h3>
+              </div>
+              <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 13 }}>
+                Set minimum distance boundary, base delivery fee, per-km charge for extra distance, and order cancellation fee.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn sm ghost"
+              onClick={async () => {
+                setPricing(DEFAULT_PRICING);
+                await api.savePricing(DEFAULT_PRICING);
+                toast('Reset fee rates to defaults', 'info');
+              }}
+            >
+              Reset Defaults
+            </button>
+          </div>
+
+          <form onSubmit={handleSavePricing} className="admin-pricing-form">
+            {/* SECTION 1: DISTANCE BOUNDARY & PER-KM SURCHARGE */}
+            <div style={{ background: '#f8fafc', padding: '16px 18px', borderRadius: 12, border: '1.5px solid #e2e8f0', marginBottom: 20 }}>
+              <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>📏</span> Minimum Distance Boundary & Extra Distance Rates
+              </h4>
+              <p style={{ margin: '0 0 14px', fontSize: 12, color: '#64748b' }}>
+                Parcels within the minimum distance boundary are charged the base fee. If destination exceeds this boundary, the extra kilometers are charged at the specified per-km rate.
+              </p>
+
+              <div className="admin-pricing-grid">
+                <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#3b82f6' }}>
+                  <label style={{ color: '#1e40af', fontWeight: 800 }}>Minimum Base Distance (km)</label>
+                  <div className="input-prefix-wrap">
+                    <span className="input-prefix" style={{ background: '#eff6ff', color: '#2563eb', fontWeight: 700 }}>km</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.5"
+                      value={pricing.base_distance_km ?? 5}
+                      onChange={(e) => setPricing((p) => ({ ...p, base_distance_km: Math.max(0.5, Number(e.target.value) || 0) }))}
+                      required
+                    />
+                  </div>
+                  <span className="pricing-hint">Base boundary covered under minimum fee (e.g. 5 km)</span>
+                </div>
+
+                <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#10b981' }}>
+                  <label style={{ color: '#065f46', fontWeight: 800 }}>Minimum Distance Delivery Fee</label>
+                  <div className="input-prefix-wrap">
+                    <span className="input-prefix" style={{ background: '#ecfdf5', color: '#059669', fontWeight: 700 }}>₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={pricing.min_distance_fee ?? 50}
+                      onChange={(e) => setPricing((p) => ({ ...p, min_distance_fee: Math.max(0, Number(e.target.value) || 0) }))}
+                      required
+                    />
+                  </div>
+                  <span className="pricing-hint">Flat delivery fee for any trip within base distance</span>
+                </div>
+
+                <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#f59e0b' }}>
+                  <label style={{ color: '#92400e', fontWeight: 800 }}>Extra Distance Rate (₹ / km)</label>
+                  <div className="input-prefix-wrap">
+                    <span className="input-prefix" style={{ background: '#fffbeb', color: '#d97706', fontWeight: 700 }}>₹/km</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.5"
+                      value={pricing.extra_per_km ?? 12}
+                      onChange={(e) => setPricing((p) => ({ ...p, extra_per_km: Math.max(0, Number(e.target.value) || 0) }))}
+                      required
+                    />
+                  </div>
+                  <span className="pricing-hint">Charged per extra km exceeding the base boundary</span>
+                </div>
+              </div>
+
+              {/* LIVE DISTANCE PRICING SIMULATOR */}
+              <div style={{ marginTop: 16, background: '#ffffff', padding: '14px 16px', borderRadius: 10, border: '1px solid #cbd5e1' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>🧮</span> Interactive Pricing Calculator & Simulator:
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>Test Distance:</span>
+                    <input
+                      type="number"
+                      min="0.5"
+                      max="150"
+                      step="0.5"
+                      value={simDist}
+                      onChange={(e) => setSimDist(Math.max(0.5, Number(e.target.value) || 0.5))}
+                      style={{ width: 70, padding: '4px 8px', borderRadius: 6, border: '1px solid #94a3b8', fontSize: 13, fontWeight: 700, textAlign: 'center' }}
+                    />
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>km</span>
+                  </div>
+                </div>
+
+                {(() => {
+                  const bDist = Number(pricing.base_distance_km) || 5;
+                  const mFee = Number(pricing.min_distance_fee) || 50;
+                  const pKm = Number(pricing.extra_per_km) || 12;
+                  const isOver = simDist > bDist;
+                  const extraKm = Math.max(0, +(simDist - bDist).toFixed(1));
+                  const extraCharge = Math.ceil(extraKm * pKm);
+                  const totalFee = mFee + extraCharge;
+
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, background: isOver ? '#fffbeb' : '#ecfdf5', padding: '10px 14px', borderRadius: 8, border: `1px solid ${isOver ? '#fde68a' : '#a7f3d0'}` }}>
+                      <div style={{ fontSize: 13 }}>
+                        <span style={{ fontWeight: 700, color: isOver ? '#92400e' : '#065f46' }}>
+                          {isOver ? `⚡ Beyond ${bDist} km Boundary (${extraKm} km extra)` : `🟢 Within ${bDist} km Boundary`}
+                        </span>
+                        <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>
+                          Base fee: ₹{mFee} (covers up to {bDist} km)
+                          {isOver ? ` + Extra ${extraKm} km × ₹${pKm}/km = +₹${extraCharge}` : ' (No extra distance charge)'}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: 20, fontWeight: 900, color: isOver ? '#b45309' : '#059669' }}>
+                          ₹{totalFee}
+                        </span>
+                        <small style={{ display: 'block', fontSize: 11, color: '#64748b' }}>Delivery Charge</small>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* SECTION 2: ORDER CANCELLATION FEE */}
+            <div style={{ background: '#f8fafc', padding: '16px 18px', borderRadius: 12, border: '1.5px solid #e2e8f0', marginBottom: 20 }}>
+              <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🚫</span> Order Cancellation Fee
+              </h4>
+              <p style={{ margin: '0 0 14px', fontSize: 12, color: '#64748b' }}>
+                Standard deduction charged when a customer cancels an unverified order.
+              </p>
+              <div style={{ maxWidth: 360 }}>
+                <div className="pricing-field-box alert-box" style={{ background: '#ffffff', borderColor: '#fca5a5' }}>
+                  <label style={{ color: '#b91c1c', fontWeight: 800 }}>Cancel Order Fee (₹)</label>
+                  <div className="input-prefix-wrap">
+                    <span className="input-prefix" style={{ background: '#fef2f2', color: '#dc2626', fontWeight: 700 }}>₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={pricing.cancellation_fee ?? 30}
+                      onChange={(e) => setPricing((p) => ({ ...p, cancellation_fee: Math.max(0, Number(e.target.value) || 0) }))}
+                      required
+                    />
+                  </div>
+                  <span className="pricing-hint">Charged if customer cancels unverified order</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="admin-pricing-footer" style={{ marginTop: 18 }}>
+              <button type="submit" className="btn sm" disabled={savingPricing} style={{ padding: '10px 24px', fontWeight: 800 }}>
+                {savingPricing ? 'Saving Rates…' : 'Save Distance Pricing Rates'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {activeTab === 'regions' && (
         <AdminRegionManager />

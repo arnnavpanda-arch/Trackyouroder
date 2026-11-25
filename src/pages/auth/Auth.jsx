@@ -392,7 +392,7 @@ function AuthFlow({ initialAction = 'signin' }) {
             </p>
 
             <div className="auth-role-cards">
-              {ROLES.map((r) => (
+              {ROLES.filter((r) => action === 'signin' || r.id !== 'admin').map((r) => (
                 <button
                   key={r.id}
                   type="button"

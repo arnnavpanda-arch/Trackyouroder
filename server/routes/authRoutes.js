@@ -58,6 +58,10 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ message: 'Name, email, and password are required' });
   }
 
+  if (role === 'admin') {
+    return res.status(403).json({ message: 'Administrator accounts cannot be created publicly.' });
+  }
+
   try {
     const [exists, settings] = await Promise.all([
       User.findOne({ email: email.toLowerCase() }).lean(),
