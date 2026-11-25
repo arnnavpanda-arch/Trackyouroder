@@ -7,7 +7,7 @@ const NAV = {
   agent: [['/agent', 'My Deliveries', 'truck']],
   admin: [
     ['/admin', 'Dashboard', 'dash'],
-    ['/admin/offers', 'Delivery Offers', 'gift'],
+    ['/admin/offers', 'Offers & Distance Rates', 'gift'],
     ['/admin/regions', 'Serviceable Areas', 'map'],
     ['/admin/orders', 'Manage Orders', 'box'],
     ['/admin/users', 'Users & Agents', 'users'],

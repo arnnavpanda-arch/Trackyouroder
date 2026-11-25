@@ -91,7 +91,7 @@ export function UserDashboard() {
             >
               <div className="row">
                 <b>{o.id}</b>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                   {(o.paymentStatus === 'not_verified' || o.agentDisputed) && <span className="badge cancelled">⚠️ Payment Not Verified by Agent</span>}
                   <StatusBadge status={o.status} />
                 </div>
@@ -1487,7 +1487,7 @@ export function MyOrders() {
       key: 'act',
       header: 'Actions',
       render: (o) => (
-        <div className="row gap" style={{ justifyContent: 'flex-start', flexWrap: 'nowrap', gap: 6, alignItems: 'center' }}>
+        <div className="row gap" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           <button
             type="button"
             className="link"

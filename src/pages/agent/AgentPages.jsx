@@ -34,24 +34,24 @@ export function AgentDeliveries() {
   // AGENT APPROVAL CHECK: Show waiting for admin approval if pending
   if (user?.role === 'agent' && (user?.isApproved === false || user?.approvalStatus === 'pending')) {
     return (
-      <div className="agent-pending-approval-card" style={{ maxWidth: 680, margin: '40px auto', padding: '36px 28px', background: '#ffffff', borderRadius: 18, border: '1.5px solid #fed7aa', boxShadow: '0 10px 30px rgba(234, 88, 12, 0.08)', textAlign: 'center' }}>
-        <div style={{ width: 72, height: 72, margin: '0 auto 18px', borderRadius: '50%', background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, border: '2px solid #fdba74' }}>
+      <div className="agent-pending-approval-card" style={{ maxWidth: 680, margin: '20px auto', padding: '24px 16px', background: '#ffffff', borderRadius: 18, border: '1.5px solid #fed7aa', boxShadow: '0 10px 30px rgba(234, 88, 12, 0.08)', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ width: 64, height: 64, margin: '0 auto 16px', borderRadius: '50%', background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, border: '2px solid #fdba74' }}>
           ⏳
         </div>
-        <span style={{ display: 'inline-block', padding: '4px 14px', borderRadius: 20, background: '#fff7ed', color: '#c2410c', fontWeight: 800, fontSize: 12, border: '1px solid #fed7aa', marginBottom: 12 }}>
+        <span style={{ display: 'inline-block', padding: '4px 12px', borderRadius: 20, background: '#fff7ed', color: '#c2410c', fontWeight: 800, fontSize: 11.5, border: '1px solid #fed7aa', marginBottom: 12, maxWidth: '100%', wordBreak: 'break-word', whiteSpace: 'normal' }}>
           APPLICATION STATUS: WAITING FOR ADMIN APPROVAL
         </span>
-        <h2 style={{ fontSize: 24, fontWeight: 900, color: '#9a3412', margin: '0 0 10px' }}>
+        <h2 style={{ fontSize: 22, fontWeight: 900, color: '#9a3412', margin: '0 0 10px' }}>
           Waiting for Admin Approval
         </h2>
-        <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.6, maxWidth: 520, margin: '0 auto 20px' }}>
+        <p style={{ fontSize: 14.5, color: '#475569', lineHeight: 1.6, maxWidth: 520, margin: '0 auto 20px' }}>
           Hello <strong>{user?.name}</strong>! Your Delivery Agent application has been received and is currently undergoing administrative verification.
         </p>
-        <div style={{ background: '#f8fafc', padding: '16px 20px', borderRadius: 12, border: '1px solid #e2e8f0', textAlign: 'left', maxWidth: 480, margin: '0 auto 24px' }}>
+        <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: 12, border: '1px solid #e2e8f0', textAlign: 'left', maxWidth: 480, margin: '0 auto 24px', width: '100%', boxSizing: 'border-box' }}>
           <h4 style={{ margin: '0 0 10px', fontSize: 14, color: '#0f172a', fontWeight: 800 }}>
             📋 Submitted Profile Details:
           </h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px', fontSize: 13, color: '#334155' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px 14px', fontSize: 13, color: '#334155' }}>
             <div><strong>Email:</strong> {user?.email}</div>
             <div><strong>Phone:</strong> {user?.phone || '—'}</div>
             <div><strong>Territory:</strong> {user?.district}, {user?.state}</div>
@@ -77,14 +77,14 @@ export function AgentDeliveries() {
 
   if (user?.role === 'agent' && user?.approvalStatus === 'rejected') {
     return (
-      <div className="agent-rejected-card" style={{ maxWidth: 640, margin: '40px auto', padding: '36px 28px', background: '#ffffff', borderRadius: 18, border: '1.5px solid #fecaca', boxShadow: '0 10px 30px rgba(220, 38, 38, 0.08)', textAlign: 'center' }}>
-        <div style={{ width: 72, height: 72, margin: '0 auto 18px', borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, border: '2px solid #fca5a5' }}>
+      <div className="agent-rejected-card" style={{ maxWidth: 640, margin: '20px auto', padding: '24px 16px', background: '#ffffff', borderRadius: 18, border: '1.5px solid #fecaca', boxShadow: '0 10px 30px rgba(220, 38, 38, 0.08)', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ width: 64, height: 64, margin: '0 auto 16px', borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, border: '2px solid #fca5a5' }}>
           ❌
         </div>
-        <span style={{ display: 'inline-block', padding: '4px 14px', borderRadius: 20, background: '#fef2f2', color: '#b91c1c', fontWeight: 800, fontSize: 12, border: '1px solid #fecaca', marginBottom: 12 }}>
+        <span style={{ display: 'inline-block', padding: '4px 12px', borderRadius: 20, background: '#fef2f2', color: '#b91c1c', fontWeight: 800, fontSize: 11.5, border: '1px solid #fecaca', marginBottom: 12, maxWidth: '100%', wordBreak: 'break-word', whiteSpace: 'normal' }}>
           APPLICATION STATUS: NOT APPROVED
         </span>
-        <h2 style={{ fontSize: 24, fontWeight: 900, color: '#991b1b', margin: '0 0 10px' }}>
+        <h2 style={{ fontSize: 22, fontWeight: 900, color: '#991b1b', margin: '0 0 10px' }}>
           Agent Application Not Approved
         </h2>
         <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.6, maxWidth: 500, margin: '0 auto 16px' }}>
@@ -246,7 +246,7 @@ export function AgentDeliveries() {
                 >
                   <b>{o.id}</b>
                 </button>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                   {o.paymentStatus === 'not_verified' && (
                     <span className="badge cancelled" style={{ fontSize: 11, fontWeight: 700 }}>
                       ⚠️ Payment Not Verified by Agent
@@ -564,8 +564,8 @@ export function AgentDeliveries() {
                 </div>
               )}
 
-              <div className="row gap" style={{ marginTop: 8, justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: 6 }}>
+              <div className="row gap" style={{ marginTop: 8, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                   <button type="button" className="btn ghost sm" onClick={() => setActiveOrderId(o.id)}>
                     Details & Track
                   </button>

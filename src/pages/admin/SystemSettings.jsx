@@ -343,13 +343,14 @@ export default function SystemSettings() {
                 <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#3b82f6' }}>
                   <label style={{ color: '#1e40af', fontWeight: 800 }}>Minimum Base Distance (km)</label>
                   <div className="input-prefix-wrap">
-                    <span className="input-prefix" style={{ background: '#eff6ff', color: '#2563eb', fontWeight: 700 }}>km</span>
+                    <span className="input-prefix" style={{ background: '#eff6ff', color: '#2563eb', fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 1, pointerEvents: 'none' }}>km</span>
                     <input
                       type="number"
                       min="0.5"
                       step="0.5"
-                      value={pricing.base_distance_km !== undefined ? pricing.base_distance_km : ''}
+                      value={pricing?.base_distance_km !== undefined && pricing?.base_distance_km !== null ? pricing.base_distance_km : 5}
                       onChange={(e) => handlePricingFieldChange('base_distance_km', e.target.value)}
+                      style={{ paddingLeft: 48, fontWeight: 800, fontSize: '1.05rem' }}
                       required
                     />
                   </div>
@@ -359,13 +360,14 @@ export default function SystemSettings() {
                 <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#10b981' }}>
                   <label style={{ color: '#065f46', fontWeight: 800 }}>Minimum Distance Delivery Fee</label>
                   <div className="input-prefix-wrap">
-                    <span className="input-prefix" style={{ background: '#ecfdf5', color: '#059669', fontWeight: 700 }}>₹</span>
+                    <span className="input-prefix" style={{ background: '#ecfdf5', color: '#059669', fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 1, pointerEvents: 'none' }}>₹</span>
                     <input
                       type="number"
                       min="0"
                       step="1"
-                      value={pricing.min_distance_fee !== undefined ? pricing.min_distance_fee : ''}
+                      value={pricing?.min_distance_fee !== undefined && pricing?.min_distance_fee !== null ? pricing.min_distance_fee : 50}
                       onChange={(e) => handlePricingFieldChange('min_distance_fee', e.target.value)}
+                      style={{ paddingLeft: 34, fontWeight: 800, fontSize: '1.05rem' }}
                       required
                     />
                   </div>
@@ -375,13 +377,14 @@ export default function SystemSettings() {
                 <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#f59e0b' }}>
                   <label style={{ color: '#92400e', fontWeight: 800 }}>Extra Distance Rate (₹ / km)</label>
                   <div className="input-prefix-wrap">
-                    <span className="input-prefix" style={{ background: '#fffbeb', color: '#d97706', fontWeight: 700 }}>₹/km</span>
+                    <span className="input-prefix" style={{ background: '#fffbeb', color: '#d97706', fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 1, pointerEvents: 'none' }}>₹/km</span>
                     <input
                       type="number"
                       min="0"
                       step="0.5"
-                      value={pricing.extra_per_km !== undefined ? pricing.extra_per_km : ''}
+                      value={pricing?.extra_per_km !== undefined && pricing?.extra_per_km !== null ? pricing.extra_per_km : 12}
                       onChange={(e) => handlePricingFieldChange('extra_per_km', e.target.value)}
+                      style={{ paddingLeft: 64, fontWeight: 800, fontSize: '1.05rem' }}
                       required
                     />
                   </div>
@@ -454,13 +457,14 @@ export default function SystemSettings() {
                 <div className="pricing-field-box alert-box" style={{ background: '#ffffff', borderColor: '#fca5a5' }}>
                   <label style={{ color: '#b91c1c', fontWeight: 800 }}>Cancel Order Fee (₹)</label>
                   <div className="input-prefix-wrap">
-                    <span className="input-prefix" style={{ background: '#fef2f2', color: '#dc2626', fontWeight: 700 }}>₹</span>
+                    <span className="input-prefix" style={{ background: '#fef2f2', color: '#dc2626', fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 1, pointerEvents: 'none' }}>₹</span>
                     <input
                       type="number"
                       min="0"
                       step="1"
-                      value={pricing.cancellation_fee !== undefined ? pricing.cancellation_fee : ''}
+                      value={pricing?.cancellation_fee !== undefined && pricing?.cancellation_fee !== null ? pricing.cancellation_fee : 30}
                       onChange={(e) => handlePricingFieldChange('cancellation_fee', e.target.value)}
+                      style={{ paddingLeft: 34, fontWeight: 800, fontSize: '1.05rem' }}
                       required
                     />
                   </div>

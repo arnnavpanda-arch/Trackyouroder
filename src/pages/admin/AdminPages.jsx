@@ -458,6 +458,13 @@ export function AdminDashboard() {
     <>
       <PageHead title="Operations overview" sub="Live numbers across all deliveries">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <a
+            href="#distance-pricing-section"
+            className="btn sm"
+            style={{ background: '#d97706', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 800, textDecoration: 'none', boxShadow: '0 2px 8px rgba(217, 119, 6, 0.25)' }}
+          >
+            <span>⚡ Distance Pricing Rates</span>
+          </a>
           <button
             type="button"
             className="btn sm"
@@ -476,6 +483,198 @@ export function AdminDashboard() {
           </Link>
         </div>
       </PageHead>
+
+      {/* 1. KEY STATS OVERVIEW */}
+      <div className="stats six" style={{ marginBottom: 18 }}>
+        <StatCard label="On-time rate" value={`${s.onTime}%`} icon="check" tone="green" />
+        <StatCard label="Avg. duration" value={`${s.avg} h`} icon="clock" tone="blue" />
+        <StatCard label="Active deliveries" value={s.active} icon="truck" tone="red" />
+        <StatCard label="Total orders" value={s.total} icon="box" tone="dark" />
+        <StatCard label="District Admins" value={districtAdmins.length} icon="users" tone="blue" />
+        <StatCard label="Satisfaction" value={`${s.csat}/5`} icon="star" tone="amber" />
+      </div>
+
+      {/* 2. PROMINENT DISTANCE PRICING & BOUNDARY CONFIGURATION */}
+      <div id="distance-pricing-section" className="card admin-pricing-card" style={{ marginBottom: 20, borderRadius: 16, border: '2px solid #93c5fd', background: '#ffffff', boxShadow: '0 4px 20px rgba(37, 99, 235, 0.08)' }}>
+        <div className="admin-pricing-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 16, marginBottom: 18 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '1.4rem' }}>⚡</span>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
+                Delivery Distance Boundary & Fee Configuration
+              </h3>
+            </div>
+            <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 13 }}>
+              Parcels are charged based on road transit distance. Base fee covers up to minimum distance, and extra kilometers are charged per-km.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn sm ghost"
+            onClick={async () => {
+              setPricing(DEFAULT_PRICING);
+              setPricingModified(false);
+              savePricing(DEFAULT_PRICING);
+              await api.savePricing(DEFAULT_PRICING);
+              toast('Reset fee rates to defaults', 'info');
+              if (typeof reload === 'function') reload();
+            }}
+          >
+            Reset Defaults
+          </button>
+        </div>
+
+        <form onSubmit={handleSavePricing} className="admin-pricing-form">
+          {/* SECTION 1: DISTANCE BOUNDARY & PER-KM SURCHARGE */}
+          <div style={{ background: '#f8fafc', padding: '16px 18px', borderRadius: 12, border: '1.5px solid #e2e8f0', marginBottom: 20 }}>
+            <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>📏</span> Minimum Distance Boundary & Extra Distance Rates
+            </h4>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: '#64748b' }}>
+              Parcels within the minimum distance boundary are charged the base fee. If destination exceeds this boundary, the extra kilometers are charged at the specified per-km rate.
+            </p>
+
+            <div className="admin-pricing-grid">
+              <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#3b82f6' }}>
+                <label style={{ color: '#1e40af', fontWeight: 800 }}>Minimum Base Distance (km)</label>
+                <div className="input-prefix-wrap">
+                  <span className="input-prefix" style={{ background: '#eff6ff', color: '#2563eb', fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 1, pointerEvents: 'none' }}>km</span>
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    value={pricing?.base_distance_km !== undefined && pricing?.base_distance_km !== null ? pricing.base_distance_km : 5}
+                    onChange={(e) => handlePricingFieldChange('base_distance_km', e.target.value)}
+                    style={{ paddingLeft: 48, fontWeight: 800, fontSize: '1.05rem' }}
+                    required
+                  />
+                </div>
+                <span className="pricing-hint">Base boundary covered under minimum fee (e.g. 5 km)</span>
+              </div>
+
+              <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#10b981' }}>
+                <label style={{ color: '#065f46', fontWeight: 800 }}>Minimum Distance Delivery Fee</label>
+                <div className="input-prefix-wrap">
+                  <span className="input-prefix" style={{ background: '#ecfdf5', color: '#059669', fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 1, pointerEvents: 'none' }}>₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={pricing?.min_distance_fee !== undefined && pricing?.min_distance_fee !== null ? pricing.min_distance_fee : 50}
+                    onChange={(e) => handlePricingFieldChange('min_distance_fee', e.target.value)}
+                    style={{ paddingLeft: 34, fontWeight: 800, fontSize: '1.05rem' }}
+                    required
+                  />
+                </div>
+                <span className="pricing-hint">Flat delivery fee for any trip within base distance</span>
+              </div>
+
+              <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#f59e0b' }}>
+                <label style={{ color: '#92400e', fontWeight: 800 }}>Extra Distance Rate (₹ / km)</label>
+                <div className="input-prefix-wrap">
+                  <span className="input-prefix" style={{ background: '#fffbeb', color: '#d97706', fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 1, pointerEvents: 'none' }}>₹/km</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={pricing?.extra_per_km !== undefined && pricing?.extra_per_km !== null ? pricing.extra_per_km : 12}
+                    onChange={(e) => handlePricingFieldChange('extra_per_km', e.target.value)}
+                    style={{ paddingLeft: 64, fontWeight: 800, fontSize: '1.05rem' }}
+                    required
+                  />
+                </div>
+                <span className="pricing-hint">Charged per extra km exceeding the base boundary</span>
+              </div>
+            </div>
+
+            {/* LIVE DISTANCE PRICING SIMULATOR */}
+            <div style={{ marginTop: 16, background: '#ffffff', padding: '14px 16px', borderRadius: 10, border: '1px solid #cbd5e1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>🧮</span> Interactive Pricing Calculator & Simulator:
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>Test Distance:</span>
+                  <input
+                    type="number"
+                    min="0.5"
+                    max="150"
+                    step="0.5"
+                    value={simDist}
+                    onChange={(e) => setSimDist(Math.max(0.5, Number(e.target.value) || 0.5))}
+                    style={{ width: 70, padding: '4px 8px', borderRadius: 6, border: '1px solid #94a3b8', fontSize: 13, fontWeight: 700, textAlign: 'center' }}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>km</span>
+                </div>
+              </div>
+
+              {(() => {
+                const bDist = Number(pricing?.base_distance_km) || 5;
+                const mFee = Number(pricing?.min_distance_fee) || 50;
+                const pKm = Number(pricing?.extra_per_km) || 12;
+                const isOver = simDist > bDist;
+                const extraKm = Math.max(0, +(simDist - bDist).toFixed(1));
+                const extraCharge = Math.ceil(extraKm * pKm);
+                const totalFee = mFee + extraCharge;
+
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, background: isOver ? '#fffbeb' : '#ecfdf5', padding: '10px 14px', borderRadius: 8, border: `1px solid ${isOver ? '#fde68a' : '#a7f3d0'}` }}>
+                    <div style={{ fontSize: 13 }}>
+                      <span style={{ fontWeight: 700, color: isOver ? '#92400e' : '#065f46' }}>
+                        {isOver ? `⚡ Beyond ${bDist} km Boundary (${extraKm} km extra)` : `🟢 Within ${bDist} km Boundary`}
+                      </span>
+                      <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>
+                        Base fee: ₹{mFee} (covers up to {bDist} km)
+                        {isOver ? ` + Extra ${extraKm} km × ₹${pKm}/km = +₹${extraCharge}` : ' (No extra distance charge)'}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: 20, fontWeight: 900, color: isOver ? '#b45309' : '#059669' }}>
+                        ₹{totalFee}
+                      </span>
+                      <small style={{ display: 'block', fontSize: 11, color: '#64748b' }}>Delivery Charge</small>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* SECTION 2: ORDER CANCELLATION FEE */}
+          <div style={{ background: '#f8fafc', padding: '16px 18px', borderRadius: 12, border: '1.5px solid #e2e8f0', marginBottom: 20 }}>
+            <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>🚫</span> Order Cancellation Fee
+            </h4>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: '#64748b' }}>
+              Standard deduction charged when a customer cancels an unverified order.
+            </p>
+            <div style={{ maxWidth: 360 }}>
+              <div className="pricing-field-box alert-box" style={{ background: '#ffffff', borderColor: '#fca5a5' }}>
+                <label style={{ color: '#b91c1c', fontWeight: 800 }}>Cancel Order Fee (₹)</label>
+                <div className="input-prefix-wrap">
+                  <span className="input-prefix" style={{ background: '#fef2f2', color: '#dc2626', fontWeight: 800, padding: '2px 6px', borderRadius: 4, zIndex: 1, pointerEvents: 'none' }}>₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={pricing?.cancellation_fee !== undefined && pricing?.cancellation_fee !== null ? pricing.cancellation_fee : 30}
+                    onChange={(e) => handlePricingFieldChange('cancellation_fee', e.target.value)}
+                    style={{ paddingLeft: 34, fontWeight: 800, fontSize: '1.05rem' }}
+                    required
+                  />
+                </div>
+                <span className="pricing-hint">Charged if customer cancels unverified order</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="admin-pricing-footer" style={{ marginTop: 18 }}>
+            <button type="submit" className="btn sm" disabled={savingPricing} style={{ padding: '10px 24px', fontWeight: 800 }}>
+              {savingPricing ? 'Saving Rates…' : 'Save Pricing Rates'}
+            </button>
+          </div>
+        </form>
+      </div>
 
       {/* SECTION: AGENT APPROVALS (PENDING DELIVERY AGENTS) */}
       {pendingAgents.length > 0 && (
@@ -497,7 +696,7 @@ export function AdminDashboard() {
             </Link>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 14 }}>
             {pendingAgents.map((ag) => (
               <div
                 key={ag.id}
@@ -616,8 +815,8 @@ export function AdminDashboard() {
             </button>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto', background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   <th style={{ padding: '12px 14px' }}>District & State</th>
@@ -779,193 +978,8 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      <div className="card admin-pricing-card" style={{ marginBottom: 18, borderRadius: 16 }}>
-        <div className="admin-pricing-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 16, marginBottom: 18 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: '1.4rem' }}>⚡</span>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
-                Delivery Distance Boundary & Fee Configuration
-              </h3>
-            </div>
-            <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 13 }}>
-              Set minimum distance boundary, base delivery fee, per-km charge for extra distance, and weight tiers.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn sm ghost"
-            onClick={async () => {
-              setPricing(DEFAULT_PRICING);
-              setPricingModified(false);
-              savePricing(DEFAULT_PRICING);
-              await api.savePricing(DEFAULT_PRICING);
-              toast('Reset fee rates to defaults', 'info');
-              if (typeof reload === 'function') reload();
-            }}
-          >
-            Reset Defaults
-          </button>
-        </div>
-
-        <form onSubmit={handleSavePricing} className="admin-pricing-form">
-          {/* SECTION 1: DISTANCE BOUNDARY & PER-KM SURCHARGE */}
-          <div style={{ background: '#f8fafc', padding: '16px 18px', borderRadius: 12, border: '1.5px solid #e2e8f0', marginBottom: 20 }}>
-            <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>📏</span> Minimum Distance Boundary & Extra Distance Rates
-            </h4>
-            <p style={{ margin: '0 0 14px', fontSize: 12, color: '#64748b' }}>
-              Parcels within the minimum distance boundary are charged the base fee. If destination exceeds this boundary, the extra kilometers are charged at the specified per-km rate.
-            </p>
-
-            <div className="admin-pricing-grid">
-              <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#3b82f6' }}>
-                <label style={{ color: '#1e40af', fontWeight: 800 }}>Minimum Base Distance (km)</label>
-                <div className="input-prefix-wrap">
-                  <span className="input-prefix" style={{ background: '#eff6ff', color: '#2563eb', fontWeight: 700 }}>km</span>
-                  <input
-                    type="number"
-                    min="0.5"
-                    step="0.5"
-                    value={pricing.base_distance_km !== undefined ? pricing.base_distance_km : ''}
-                    onChange={(e) => handlePricingFieldChange('base_distance_km', e.target.value)}
-                    required
-                  />
-                </div>
-                <span className="pricing-hint">Base boundary covered under minimum fee (e.g. 5 km)</span>
-              </div>
-
-              <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#10b981' }}>
-                <label style={{ color: '#065f46', fontWeight: 800 }}>Minimum Distance Delivery Fee</label>
-                <div className="input-prefix-wrap">
-                  <span className="input-prefix" style={{ background: '#ecfdf5', color: '#059669', fontWeight: 700 }}>₹</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={pricing.min_distance_fee !== undefined ? pricing.min_distance_fee : ''}
-                    onChange={(e) => handlePricingFieldChange('min_distance_fee', e.target.value)}
-                    required
-                  />
-                </div>
-                <span className="pricing-hint">Flat delivery fee for any trip within base distance</span>
-              </div>
-
-              <div className="pricing-field-box" style={{ background: '#ffffff', borderColor: '#f59e0b' }}>
-                <label style={{ color: '#92400e', fontWeight: 800 }}>Extra Distance Rate (₹ / km)</label>
-                <div className="input-prefix-wrap">
-                  <span className="input-prefix" style={{ background: '#fffbeb', color: '#d97706', fontWeight: 700 }}>₹/km</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={pricing.extra_per_km !== undefined ? pricing.extra_per_km : ''}
-                    onChange={(e) => handlePricingFieldChange('extra_per_km', e.target.value)}
-                    required
-                  />
-                </div>
-                <span className="pricing-hint">Charged per extra km exceeding the base boundary</span>
-              </div>
-            </div>
-
-            {/* LIVE DISTANCE PRICING SIMULATOR */}
-            <div style={{ marginTop: 16, background: '#ffffff', padding: '14px 16px', borderRadius: 10, border: '1px solid #cbd5e1' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>🧮</span> Interactive Pricing Calculator & Simulator:
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, color: '#64748b' }}>Test Distance:</span>
-                  <input
-                    type="number"
-                    min="0.5"
-                    max="150"
-                    step="0.5"
-                    value={simDist}
-                    onChange={(e) => setSimDist(Math.max(0.5, Number(e.target.value) || 0.5))}
-                    style={{ width: 70, padding: '4px 8px', borderRadius: 6, border: '1px solid #94a3b8', fontSize: 13, fontWeight: 700, textAlign: 'center' }}
-                  />
-                  <span style={{ fontSize: 13, fontWeight: 700 }}>km</span>
-                </div>
-              </div>
-
-              {(() => {
-                const bDist = Number(pricing.base_distance_km) || 5;
-                const mFee = Number(pricing.min_distance_fee) || 50;
-                const pKm = Number(pricing.extra_per_km) || 12;
-                const isOver = simDist > bDist;
-                const extraKm = Math.max(0, +(simDist - bDist).toFixed(1));
-                const extraCharge = Math.ceil(extraKm * pKm);
-                const totalFee = mFee + extraCharge;
-
-                return (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, background: isOver ? '#fffbeb' : '#ecfdf5', padding: '10px 14px', borderRadius: 8, border: `1px solid ${isOver ? '#fde68a' : '#a7f3d0'}` }}>
-                    <div style={{ fontSize: 13 }}>
-                      <span style={{ fontWeight: 700, color: isOver ? '#92400e' : '#065f46' }}>
-                        {isOver ? `⚡ Beyond ${bDist} km Boundary (${extraKm} km extra)` : `🟢 Within ${bDist} km Boundary`}
-                      </span>
-                      <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>
-                        Base fee: ₹{mFee} (covers up to {bDist} km)
-                        {isOver ? ` + Extra ${extraKm} km × ₹${pKm}/km = +₹${extraCharge}` : ' (No extra distance charge)'}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: 20, fontWeight: 900, color: isOver ? '#b45309' : '#059669' }}>
-                        ₹{totalFee}
-                      </span>
-                      <small style={{ display: 'block', fontSize: 11, color: '#64748b' }}>Delivery Charge</small>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* SECTION 2: ORDER CANCELLATION FEE */}
-          <div style={{ background: '#f8fafc', padding: '16px 18px', borderRadius: 12, border: '1.5px solid #e2e8f0', marginBottom: 20 }}>
-            <h4 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>🚫</span> Order Cancellation Fee
-            </h4>
-            <p style={{ margin: '0 0 14px', fontSize: 12, color: '#64748b' }}>
-              Standard deduction charged when a customer cancels an unverified order.
-            </p>
-            <div style={{ maxWidth: 360 }}>
-              <div className="pricing-field-box alert-box" style={{ background: '#ffffff', borderColor: '#fca5a5' }}>
-                <label style={{ color: '#b91c1c', fontWeight: 800 }}>Cancel Order Fee (₹)</label>
-                <div className="input-prefix-wrap">
-                  <span className="input-prefix" style={{ background: '#fef2f2', color: '#dc2626', fontWeight: 700 }}>₹</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={pricing.cancellation_fee !== undefined ? pricing.cancellation_fee : ''}
-                    onChange={(e) => handlePricingFieldChange('cancellation_fee', e.target.value)}
-                    required
-                  />
-                </div>
-                <span className="pricing-hint">Charged if customer cancels unverified order</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="admin-pricing-footer" style={{ marginTop: 18 }}>
-            <button type="submit" className="btn sm" disabled={savingPricing} style={{ padding: '10px 24px', fontWeight: 800 }}>
-              {savingPricing ? 'Saving Rates…' : 'Save Pricing Rates'}
-            </button>
-          </div>
-        </form>
-      </div>
-
       {/* Admin Delivery Offers & Promotions Card */}
       <AdminOfferEditor onOfferSaved={reload} />
-      <div className="stats six">
-        <StatCard label="On-time rate" value={`${s.onTime}%`} icon="check" tone="green" />
-        <StatCard label="Avg. duration" value={`${s.avg} h`} icon="clock" tone="blue" />
-        <StatCard label="Active deliveries" value={s.active} icon="truck" tone="red" />
-        <StatCard label="Total orders" value={s.total} icon="box" tone="dark" />
-        <StatCard label="District Admins" value={districtAdmins.length} icon="users" tone="blue" />
-        <StatCard label="Satisfaction" value={`${s.csat}/5`} icon="star" tone="amber" />
-      </div>
       <div className="charts">
         <div className="card wide"><h3>Orders · last 7 days</h3>
           <ResponsiveContainer width="100%" height={260}><AreaChart data={perDay}>
@@ -1078,7 +1092,7 @@ export function ManageOrders({ districtOnly = false }) {
       key: 'act',
       header: 'Actions',
       render: (o) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {/* Button 1: View */}
           <Link
             to={`${orderViewBase}/${encodeOrderSlug(o.id)}`}
@@ -1376,7 +1390,7 @@ export function ManageUsers({ districtOnly = false, initialRole }) {
       key: 'act',
       header: 'Actions',
       render: (u) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={() => setDistrictAdminModal({ user: u })}
@@ -1496,7 +1510,7 @@ export function ManageUsers({ districtOnly = false, initialRole }) {
       )
     )},
     { key: 'act', header: 'Actions', render: (u) => (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         {u.role === 'agent' && (u.isApproved === false || u.approvalStatus === 'pending') && (
           <button
             type="button"

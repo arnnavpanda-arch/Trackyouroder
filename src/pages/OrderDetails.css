@@ -911,6 +911,70 @@
 
 /* Responsive adjustments */
 @media (max-width: 640px) {
+  .trk-page {
+    padding: 6px 4px 60px;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  .trk-nav-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .trk-nav-meta {
+    justify-content: space-between;
+    width: 100%;
+  }
+  .trk-header-card {
+    padding: 16px 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .trk-header-left h1 {
+    font-size: 1.35rem;
+    flex-wrap: wrap;
+  }
+  .trk-header-sub {
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+  }
+  .trk-header-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .trk-header-actions > * {
+    flex: 1 1 auto;
+    text-align: center;
+    justify-content: center;
+  }
+  .customer-delivery-otp-banner {
+    padding: 14px 12px !important;
+    flex-direction: column !important;
+    text-align: center !important;
+    align-items: center !important;
+  }
+  .customer-delivery-otp-banner > div {
+    flex-direction: column !important;
+    text-align: center !important;
+  }
+  .trk-courier-banner {
+    padding: 12px 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .trk-courier-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .trk-courier-actions > * {
+    flex: 1 1 auto;
+  }
   .trk-stepper {
     grid-template-columns: repeat(2, 1fr);
     gap: 16px;
