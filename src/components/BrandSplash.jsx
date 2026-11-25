@@ -11,13 +11,24 @@ export default function BrandSplash() {
   useEffect(() => {
     const target = user ? homeFor(user.role) : '/login';
 
+    // If user already logged in or splash was already shown in this session, navigate immediately
+    const alreadySeen = typeof window !== 'undefined' && sessionStorage.getItem('brand_splash_seen');
+    if (user || alreadySeen) {
+      navigate(target, { replace: true });
+      return;
+    }
+
+    try {
+      sessionStorage.setItem('brand_splash_seen', '1');
+    } catch {}
+
     const exitTimer = setTimeout(() => {
       setLeaving(true);
-    }, 2200);
+    }, 450);
 
     const navTimer = setTimeout(() => {
       navigate(target, { replace: true });
-    }, 2600);
+    }, 650);
 
     const handleSkip = () => {
       navigate(target, { replace: true });

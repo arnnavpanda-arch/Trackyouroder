@@ -69,7 +69,11 @@ export function AppProvider({ children }) {
     window.addEventListener('visibilitychange', onFocusOrVisible);
     window.addEventListener('focus', onFocusOrVisible);
 
-    const timer = setInterval(loadSettings, 10000);
+    const timer = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        loadSettings();
+      }
+    }, 45000);
     return () => {
       window.removeEventListener('visibilitychange', onFocusOrVisible);
       window.removeEventListener('focus', onFocusOrVisible);

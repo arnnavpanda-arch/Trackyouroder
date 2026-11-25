@@ -11,6 +11,7 @@ const NAV = {
     ['/admin/regions', 'Serviceable Areas', 'map'],
     ['/admin/orders', 'Manage Orders', 'box'],
     ['/admin/users', 'Users & Agents', 'users'],
+    ['/admin/district-admins', 'District Admins', 'users'],
     ['/admin/live', 'Live Monitoring', 'map'],
     ['/admin/reports', 'Reports', 'chart'],
     ['/admin/settings', 'System Settings', 'settings'],

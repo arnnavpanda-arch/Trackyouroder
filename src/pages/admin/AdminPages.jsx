@@ -18,6 +18,197 @@ import { ALL_INDIAN_STATES, INDIA_STATES_DATA, isRegionEligible } from '../../ut
 const SC = ['#9aa3b2', '#d97706', '#2563eb', '#16a34a'];
 const fetchAll = () => Promise.all([api.listOrders(), api.listUsers(), api.getPricing().catch(() => DEFAULT_PRICING)]);
 
+function DistrictPasswordCell({ password }) {
+  const [show, setShow] = useState(false);
+  const { toast } = useApp();
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+      <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#0f172a', fontWeight: 700, minWidth: 90 }}>
+        {show ? (password || 'No Password') : '••••••••'}
+      </span>
+      <button
+        type="button"
+        className="btn xs ghost"
+        style={{ padding: '2px 5px', fontSize: 11 }}
+        onClick={() => setShow(!show)}
+        title={show ? 'Hide Password' : 'Show Password'}
+      >
+        {show ? '🙈' : '👁️'}
+      </button>
+      {password && (
+        <button
+          type="button"
+          className="btn xs ghost"
+          style={{ padding: '2px 5px', fontSize: 11 }}
+          onClick={() => {
+            navigator.clipboard.writeText(password);
+            toast('District Admin Password copied!', 'info');
+          }}
+          title="Copy Password"
+        >
+          📋
+        </button>
+      )}
+    </div>
+  );
+}
+
+function DistrictAdminModal({ user, onClose, onSaved }) {
+  const { toast, settings } = useApp();
+  const [state, setState] = useState(user?.state || 'Odisha');
+  const [district, setDistrict] = useState(user?.district || '');
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [password, setPassword] = useState(user?.displayPassword || '');
+  const [errs, setErrs] = useState({});
+  const [busy, setBusy] = useState(false);
+
+  const availableStates = ALL_INDIAN_STATES;
+
+  const handleStateChange = (st) => {
+    setState(st);
+    setDistrict('');
+  };
+
+  const handleDistrictChange = (dist) => {
+    setDistrict(dist);
+    if (!user?.id) {
+      if (!name) setName(`${dist} Admin`);
+      if (!email) {
+        const slug = dist.toLowerCase().replace(/[^a-z0-9]/g, '');
+        setEmail(`${slug}_admin@trackora.in`);
+      }
+    }
+  };
+
+  const submit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const er = {};
+    if (!state) er.state = 'Please select eligible state';
+    if (!district) er.district = 'Please select district';
+    if (!name || name.trim().length < 2) er.name = 'Please enter administrator name';
+    if (!email || !email.includes('@')) er.email = 'Please enter a valid login user ID / email';
+    if (!user?.id && (!password || password.length < 4)) er.password = 'Password must be at least 4 characters';
+
+    setErrs(er);
+    if (Object.keys(er).length > 0) return;
+
+    setBusy(true);
+    try {
+      const payload = {
+        ...(user?.id ? { id: user.id } : {}),
+        role: 'district_admin',
+        state,
+        district,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+        ...(password ? { password, displayPassword: password } : {}),
+      };
+      await api.saveUser(payload);
+      toast(user?.id ? 'District Admin updated successfully' : 'District Admin created successfully! Credentials saved in table.', 'success');
+      onSaved();
+    } catch (err) {
+      toast(err.message || 'Failed to save District Admin', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={user?.id ? `Edit District Admin · ${user.district}` : '🏛️ Create District Admin Login'}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>Cancel</button>
+          <button className="btn" disabled={busy} onClick={submit}>
+            {busy ? 'Saving…' : user?.id ? 'Update Credentials' : 'Create District Login'}
+          </button>
+        </>
+      }
+    >
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ background: '#eff6ff', padding: '10px 14px', borderRadius: 8, border: '1px solid #bfdbfe', fontSize: 13, color: '#1e40af' }}>
+          ℹ️ District Admins have restricted access: only <b>Approve Couriers</b>, <b>Manage Orders</b>, and <b>Live Monitoring</b> in their district.
+        </div>
+
+        <div className="grid2">
+          <Field label="State (All 36 States/UTs)" error={errs.state}>
+            <select value={state} onChange={(e) => handleStateChange(e.target.value)} style={{ padding: '9px 12px', borderRadius: 8, width: '100%' }}>
+              <option value="">-- Select State --</option>
+              {availableStates.map((st) => {
+                const isOk = isRegionEligible(st, null, settings?.serviceable_regions);
+                return (
+                  <option key={st} value={st}>
+                    {st} {isOk ? '✓ (Eligible)' : '⚠️ (Inactive)'}
+                  </option>
+                );
+              })}
+            </select>
+          </Field>
+
+          <Field label="Eligible District" error={errs.district}>
+            <select value={district} onChange={(e) => handleDistrictChange(e.target.value)} disabled={!state} style={{ padding: '9px 12px', borderRadius: 8, width: '100%' }}>
+              <option value="">{state ? '-- Select District --' : '-- Choose State first --'}</option>
+              {(state && INDIA_STATES_DATA[state] ? INDIA_STATES_DATA[state] : []).map((dist) => {
+                const isDistOk = isRegionEligible(state, dist, settings?.serviceable_regions);
+                return (
+                  <option key={dist} value={dist}>
+                    {dist} {isDistOk ? '' : '(Inactive)'}
+                  </option>
+                );
+              })}
+            </select>
+          </Field>
+        </div>
+
+        <Field label="District Admin Full Name" error={errs.name}>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Khordha Dispatch Coordinator"
+          />
+        </Field>
+
+        <div className="grid2">
+          <Field label="User ID / Login Email" error={errs.email}>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="e.g. khordha_admin@trackora.in"
+            />
+          </Field>
+
+          <Field label="Contact Phone" error={errs.phone}>
+            <input
+              maxLength={10}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="10-digit mobile number"
+            />
+          </Field>
+        </div>
+
+        <Field label={user?.id ? 'Password (Leave blank to keep current)' : 'Password (Saved and visible in dashboard)'} error={errs.password}>
+          <input
+            type="text"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter password (e.g. Khordha@2026)"
+          />
+          <small style={{ color: '#64748b', display: 'block', marginTop: 4 }}>
+            💡 This password will be securely saved and displayed in the Admin Dashboard table for easy copy and lookup.
+          </small>
+        </Field>
+      </form>
+    </Modal>
+  );
+}
+
 export function AdminDashboard() {
   const { data, loading, error, reload } = useLiveData(fetchAll, []);
   const { toast, socket, settings, setSettings } = useApp() || {};
@@ -29,6 +220,9 @@ export function AdminDashboard() {
   const [offer, setOffer] = useState(() => (pricing?.delivery_offer ? { ...DEFAULT_OFFER, ...pricing.delivery_offer } : DEFAULT_OFFER));
   const [savingOffer, setSavingOffer] = useState(false);
   const [approvingAgentId, setApprovingAgentId] = useState(null);
+  const [districtAdminModal, setDistrictAdminModal] = useState(null);
+  const [deletingUser, setDeletingUser] = useState(null);
+  const [busyDelete, setBusyDelete] = useState(false);
 
   useEffect(() => {
     if (settings?.logo_url) {
@@ -226,6 +420,22 @@ export function AdminDashboard() {
   const pie = STATUSES.map((x) => ({ name: x, value: orders.filter((o) => o.status === x).length }));
   const agents = users.filter((u) => u.role === 'agent').map((a) => ({ name: a.name.split(' ')[0], delivered: orders.filter((o) => o.agentId === a.id && o.status === 'Delivered').length }));
   const pendingAgents = (users || []).filter((u) => u.role === 'agent' && (u.isApproved === false || u.approvalStatus === 'pending'));
+  const districtAdmins = (users || []).filter((u) => u.role === 'district_admin');
+
+  const handleDeleteDistrictAdmin = async () => {
+    if (!deletingUser) return;
+    setBusyDelete(true);
+    try {
+      await api.deleteUser(deletingUser.id);
+      toast(`District Admin "${deletingUser.name}" deleted successfully`, 'success');
+      setDeletingUser(null);
+      await reload();
+    } catch (e) {
+      toast(e.message || 'Failed to delete district admin', 'error');
+    } finally {
+      setBusyDelete(false);
+    }
+  };
 
   const handleApproveAgent = async (ag, approved) => {
     let remarks = '';
@@ -248,6 +458,15 @@ export function AdminDashboard() {
     <>
       <PageHead title="Operations overview" sub="Live numbers across all deliveries">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn sm"
+            onClick={() => setDistrictAdminModal({ user: null })}
+            style={{ background: '#1e40af', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 800, boxShadow: '0 2px 8px rgba(30, 64, 175, 0.25)' }}
+          >
+            <Icon n="plus" size={16} />
+            <span>🏛️ + Add District Admin</span>
+          </button>
           <Link to="/admin/regions" className="btn sm" style={{ background: '#2563eb', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <span>📍 Serviceable States & Districts</span>
           </Link>
@@ -345,6 +564,186 @@ export function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* SECTION: DISTRICT ADMIN ROLE & CREDENTIAL MANAGEMENT */}
+      <div className="card" style={{ marginBottom: 18, borderRadius: 16, border: '2px solid #bfdbfe', background: '#f8fafc' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, borderBottom: '1.5px solid #e2e8f0', paddingBottom: 14, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: '1.8rem' }}>🏛️</span>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#1e3a8a' }}>
+                  District Admin Role & Credential Management
+                </h3>
+                <span style={{ fontSize: 12, fontWeight: 800, background: '#dbeafe', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: 12 }}>
+                  {districtAdmins.length} Logins Configured
+                </span>
+              </div>
+              <p style={{ margin: '3px 0 0', fontSize: 13, color: '#475569' }}>
+                Set User ID and Password for eligible districts. District Admins have restricted access to manage orders, approve agents, and view live tracking in their district only.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="btn sm"
+              onClick={() => setDistrictAdminModal({ user: null })}
+              style={{ background: '#2563eb', color: '#fff', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)' }}
+            >
+              <Icon n="plus" size={16} /> + Add District Admin Login
+            </button>
+            <Link to="/admin/users" className="btn sm ghost" style={{ fontWeight: 700 }}>
+              All Users & Agents →
+            </Link>
+          </div>
+        </div>
+
+        {districtAdmins.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '28px 20px', background: '#ffffff', borderRadius: 12, border: '1px dashed #cbd5e1' }}>
+            <span style={{ fontSize: 36, display: 'block', marginBottom: 8 }}>🏛️</span>
+            <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#334155' }}>No District Admin Logins Created Yet</h4>
+            <p style={{ margin: '6px auto 16px', maxWidth: 440, fontSize: 13, color: '#64748b' }}>
+              Create district admin accounts for eligible states and districts. The generated User ID and Password will be saved and displayed here for easy lookup and copy.
+            </p>
+            <button
+              type="button"
+              className="btn sm"
+              onClick={() => setDistrictAdminModal({ user: null })}
+              style={{ background: '#2563eb', color: '#fff', fontWeight: 800 }}
+            >
+              + Create First District Admin Login
+            </button>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto', background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <th style={{ padding: '12px 14px' }}>District & State</th>
+                  <th style={{ padding: '12px 14px' }}>Admin Name</th>
+                  <th style={{ padding: '12px 14px' }}>User ID / Login Email</th>
+                  <th style={{ padding: '12px 14px' }}>Saved Password (Credentials)</th>
+                  <th style={{ padding: '12px 14px' }}>Contact Phone</th>
+                  <th style={{ padding: '12px 14px' }}>Status</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {districtAdmins.map((da) => (
+                  <tr key={da.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '12px 14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 15 }}>🏛️</span>
+                        <b style={{ color: '#0f172a', fontSize: 13.5 }}>{da.district || 'Unassigned District'}</b>
+                      </div>
+                      <small style={{ color: '#64748b', marginLeft: 21, fontSize: 11 }}>{da.state || 'India'}</small>
+                    </td>
+                    <td style={{ padding: '12px 14px', fontWeight: 600, color: '#1e293b' }}>
+                      {da.name}
+                    </td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '3px 8px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                        <code style={{ fontSize: 12.5, color: '#0f172a', fontWeight: 600 }}>{da.email}</code>
+                        <button
+                          type="button"
+                          className="btn xs ghost"
+                          style={{ padding: '2px 5px', fontSize: 11 }}
+                          title="Copy User ID / Email"
+                          onClick={() => {
+                            navigator.clipboard.writeText(da.email);
+                            toast(`Copied ${da.email} to clipboard!`, 'info');
+                          }}
+                        >
+                          📋
+                        </button>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <DistrictPasswordCell password={da.displayPassword || ''} />
+                    </td>
+                    <td style={{ padding: '12px 14px', color: '#475569' }}>
+                      {da.phone || '—'}
+                    </td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <span className={`pill ${da.active ? 'on' : 'off'}`}>{da.active ? 'Active' : 'Inactive'}</span>
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => setDistrictAdminModal({ user: da })}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            borderRadius: 6,
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            border: '1px solid #bfdbfe',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <span>✏️</span> Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await api.toggleUser(da.id);
+                              toast(da.active ? 'District admin deactivated' : 'District admin activated', 'success');
+                              reload();
+                            } catch (e) {
+                              toast(e.message, 'error');
+                            }
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            borderRadius: 6,
+                            background: da.active ? '#fffbeb' : '#f0fdf4',
+                            color: da.active ? '#b45309' : '#15803d',
+                            border: `1px solid ${da.active ? '#fde68a' : '#bbf7d0'}`,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <span>{da.active ? '⏸' : '▶'}</span> {da.active ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          type="button"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            borderRadius: 6,
+                            background: '#fef2f2',
+                            color: '#dc2626',
+                            border: '1px solid #fecaca',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                          onClick={() => setDeletingUser(da)}
+                        >
+                          <span>🗑️</span> Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="card admin-branding-card" style={{ marginBottom: 18 }}>
         <div className="admin-branding-header">
@@ -559,11 +958,12 @@ export function AdminDashboard() {
 
       {/* Admin Delivery Offers & Promotions Card */}
       <AdminOfferEditor onOfferSaved={reload} />
-      <div className="stats five">
+      <div className="stats six">
         <StatCard label="On-time rate" value={`${s.onTime}%`} icon="check" tone="green" />
         <StatCard label="Avg. duration" value={`${s.avg} h`} icon="clock" tone="blue" />
         <StatCard label="Active deliveries" value={s.active} icon="truck" tone="red" />
         <StatCard label="Total orders" value={s.total} icon="box" tone="dark" />
+        <StatCard label="District Admins" value={districtAdmins.length} icon="users" tone="blue" />
         <StatCard label="Satisfaction" value={`${s.csat}/5`} icon="star" tone="amber" />
       </div>
       <div className="charts">
@@ -578,6 +978,36 @@ export function AdminDashboard() {
         <div className="card wide"><h3>Deliveries by agent</h3>
           <ResponsiveContainer width="100%" height={220}><BarChart data={agents}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7ec" /><XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={12} width={28} /><Tooltip /><Bar dataKey="delivered" fill="#15171d" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div>
       </div>
+
+      {districtAdminModal && (
+        <DistrictAdminModal
+          user={districtAdminModal.user}
+          onClose={() => setDistrictAdminModal(null)}
+          onSaved={() => { setDistrictAdminModal(null); reload(); }}
+        />
+      )}
+
+      {deletingUser && (
+        <Modal
+          title={`Delete District Admin?`}
+          onClose={() => setDeletingUser(null)}
+          footer={
+            <>
+              <button className="btn ghost" onClick={() => setDeletingUser(null)}>Cancel</button>
+              <button className="btn danger" disabled={busyDelete} onClick={handleDeleteDistrictAdmin}>
+                {busyDelete ? 'Deleting…' : 'Delete Account'}
+              </button>
+            </>
+          }
+        >
+          <p style={{ margin: 0, fontSize: 14, color: '#334155' }}>
+            Are you sure you want to permanently delete District Admin <b>{deletingUser.name}</b> for <b>{deletingUser.district}</b> (<code>{deletingUser.email}</code>)?
+          </p>
+          <div style={{ marginTop: 12, padding: 12, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#991b1b' }}>
+            ⚠️ This action is permanent. This district admin will be removed and will no longer be able to log in.
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
@@ -825,202 +1255,15 @@ export function ManageOrders({ districtOnly = false }) {
   );
 }
 
-function DistrictPasswordCell({ password }) {
-  const [show, setShow] = useState(false);
-  const { toast } = useApp();
-
-  return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
-      <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#0f172a', fontWeight: 700, minWidth: 90 }}>
-        {show ? (password || 'No Password') : '••••••••'}
-      </span>
-      <button
-        type="button"
-        className="btn xs ghost"
-        style={{ padding: '2px 5px', fontSize: 11 }}
-        onClick={() => setShow(!show)}
-        title={show ? 'Hide Password' : 'Show Password'}
-      >
-        {show ? '🙈' : '👁️'}
-      </button>
-      {password && (
-        <button
-          type="button"
-          className="btn xs ghost"
-          style={{ padding: '2px 5px', fontSize: 11 }}
-          onClick={() => {
-            navigator.clipboard.writeText(password);
-            toast('District Admin Password copied!', 'info');
-          }}
-          title="Copy Password"
-        >
-          📋
-        </button>
-      )}
-    </div>
-  );
-}
-
-function DistrictAdminModal({ user, onClose, onSaved }) {
-  const { toast, settings } = useApp();
-  const [state, setState] = useState(user?.state || 'Odisha');
-  const [district, setDistrict] = useState(user?.district || '');
-  const [name, setName] = useState(user?.name || '');
-  const [email, setEmail] = useState(user?.email || '');
-  const [phone, setPhone] = useState(user?.phone || '');
-  const [password, setPassword] = useState(user?.displayPassword || '');
-  const [errs, setErrs] = useState({});
-  const [busy, setBusy] = useState(false);
-
-  const availableStates = ALL_INDIAN_STATES;
-
-  const handleStateChange = (st) => {
-    setState(st);
-    setDistrict('');
-  };
-
-  const handleDistrictChange = (dist) => {
-    setDistrict(dist);
-    if (!user?.id) {
-      if (!name) setName(`${dist} Admin`);
-      if (!email) {
-        const slug = dist.toLowerCase().replace(/[^a-z0-9]/g, '');
-        setEmail(`${slug}_admin@trackora.in`);
-      }
-    }
-  };
-
-  const submit = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    const er = {};
-    if (!state) er.state = 'Please select eligible state';
-    if (!district) er.district = 'Please select district';
-    if (!name || name.trim().length < 2) er.name = 'Please enter administrator name';
-    if (!email || !email.includes('@')) er.email = 'Please enter a valid login user ID / email';
-    if (!user?.id && (!password || password.length < 4)) er.password = 'Password must be at least 4 characters';
-
-    setErrs(er);
-    if (Object.keys(er).length > 0) return;
-
-    setBusy(true);
-    try {
-      const payload = {
-        ...(user?.id ? { id: user.id } : {}),
-        role: 'district_admin',
-        state,
-        district,
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone.trim(),
-        ...(password ? { password, displayPassword: password } : {}),
-      };
-      await api.saveUser(payload);
-      toast(user?.id ? 'District Admin updated successfully' : 'District Admin created successfully! Credentials saved in table.', 'success');
-      onSaved();
-    } catch (err) {
-      toast(err.message || 'Failed to save District Admin', 'error');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      title={user?.id ? `Edit District Admin · ${user.district}` : '🏛️ Create District Admin Login'}
-      onClose={onClose}
-      footer={
-        <>
-          <button className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className="btn" disabled={busy} onClick={submit}>
-            {busy ? 'Saving…' : user?.id ? 'Update Credentials' : 'Create District Login'}
-          </button>
-        </>
-      }
-    >
-      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ background: '#eff6ff', padding: '10px 14px', borderRadius: 8, border: '1px solid #bfdbfe', fontSize: 13, color: '#1e40af' }}>
-          ℹ️ District Admins have restricted access: only <b>Approve Couriers</b>, <b>Manage Orders</b>, and <b>Live Monitoring</b> in their district.
-        </div>
-
-        <div className="grid2">
-          <Field label="State (All 36 States/UTs)" error={errs.state}>
-            <select value={state} onChange={(e) => handleStateChange(e.target.value)} style={{ padding: '9px 12px', borderRadius: 8, width: '100%' }}>
-              <option value="">-- Select State --</option>
-              {availableStates.map((st) => {
-                const isOk = isRegionEligible(st, null, settings?.serviceable_regions);
-                return (
-                  <option key={st} value={st}>
-                    {st} {isOk ? '✓ (Eligible)' : '⚠️ (Inactive)'}
-                  </option>
-                );
-              })}
-            </select>
-          </Field>
-
-          <Field label="Eligible District" error={errs.district}>
-            <select value={district} onChange={(e) => handleDistrictChange(e.target.value)} disabled={!state} style={{ padding: '9px 12px', borderRadius: 8, width: '100%' }}>
-              <option value="">{state ? '-- Select District --' : '-- Choose State first --'}</option>
-              {(state && INDIA_STATES_DATA[state] ? INDIA_STATES_DATA[state] : []).map((dist) => {
-                const isDistOk = isRegionEligible(state, dist, settings?.serviceable_regions);
-                return (
-                  <option key={dist} value={dist}>
-                    {dist} {isDistOk ? '' : '(Inactive)'}
-                  </option>
-                );
-              })}
-            </select>
-          </Field>
-        </div>
-
-        <Field label="District Admin Full Name" error={errs.name}>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Khordha Dispatch Coordinator"
-          />
-        </Field>
-
-        <div className="grid2">
-          <Field label="User ID / Login Email" error={errs.email}>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. khordha_admin@trackora.in"
-            />
-          </Field>
-
-          <Field label="Contact Phone" error={errs.phone}>
-            <input
-              maxLength={10}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="10-digit mobile number"
-            />
-          </Field>
-        </div>
-
-        <Field label={user?.id ? 'Password (Leave blank to keep current)' : 'Password (Saved and visible in dashboard)'} error={errs.password}>
-          <input
-            type="text"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter password (e.g. Khordha@2026)"
-          />
-          <small style={{ color: '#64748b', display: 'block', marginTop: 4 }}>
-            💡 This password will be securely saved and displayed in the Admin Dashboard table for easy copy and lookup.
-          </small>
-        </Field>
-      </form>
-    </Modal>
-  );
-}
-
-export function ManageUsers({ districtOnly = false }) {
+export function ManageUsers({ districtOnly = false, initialRole }) {
   const { toast, user: me, settings } = useApp();
   const isDistrictAdmin = districtOnly || me?.role === 'district_admin';
   const { data, loading, error, reload } = useLiveData(() => api.listUsers(), []);
-  const [role, setRole] = useState(isDistrictAdmin ? 'pending_approvals' : 'user');
+  const [role, setRole] = useState(initialRole || (isDistrictAdmin ? 'pending_approvals' : 'user'));
+
+  useEffect(() => {
+    if (initialRole) setRole(initialRole);
+  }, [initialRole]);
   const [q, setQ] = useState('');
   const [form, setForm] = useState(null);
   const [districtAdminModal, setDistrictAdminModal] = useState(null);

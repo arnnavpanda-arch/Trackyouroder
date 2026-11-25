@@ -74,8 +74,12 @@ function useLiveParcelStats() {
     };
     window.addEventListener('storage', onStorage);
 
-    // Active polling interval every 2.5 seconds to guarantee live sync
-    const interval = setInterval(fetchLatest, 2500);
+    // Active polling interval every 10 seconds when tab is active
+    const interval = setInterval(() => {
+      if (typeof document === 'undefined' || !document.hidden) {
+        fetchLatest();
+      }
+    }, 10000);
 
     return () => {
       if (socket?.off) {
@@ -151,7 +155,7 @@ function Hero() {
               autoPlay
               muted
               playsInline
-              preload="auto"
+              preload="metadata"
               onEnded={() => {
                 hasCelebratedRef.current = true;
                 setShowCelebration(true);

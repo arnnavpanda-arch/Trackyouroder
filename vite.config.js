@@ -17,4 +17,15 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-charts': ['recharts'],
+          'vendor-network': ['socket.io-client', 'axios'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 800,
+  },
 });
