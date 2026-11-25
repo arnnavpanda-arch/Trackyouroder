@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { QRCodeView, BarcodeView } from './CodeViews';
 import { fmtDate } from '../utils/helpers';
 import { api } from '../services/api';
@@ -82,7 +83,7 @@ export default function ShipmentReceiptModal({ order, isOpen, onClose }) {
     : (import.meta.env.VITE_API_URL || 'http://localhost:5001/api');
   const pdfDownloadUrl = `${apiBase}/orders/${order.id}/invoice-pdf`;
 
-  return (
+  const modalContent = (
     <div
       className="receipt-modal-backdrop"
       onMouseDown={(e) => {
@@ -246,76 +247,78 @@ export default function ShipmentReceiptModal({ order, isOpen, onClose }) {
           </div>
 
           {/* Amazon-style Itemized Table */}
-          <table className="amz-table">
-            <thead>
-              <tr>
-                <th style={{ width: '40px', textAlign: 'center' }}>Sl.</th>
-                <th>Description</th>
-                <th style={{ width: '130px' }}>Type / Weight</th>
-                <th style={{ width: '50px', textAlign: 'center' }}>Qty</th>
-                <th style={{ width: '100px', textAlign: 'right' }}>Gross (₹)</th>
-                <th style={{ width: '90px', textAlign: 'right' }}>Tax (₹)</th>
-                <th style={{ width: '110px', textAlign: 'right' }}>Total (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={{ textAlign: 'center' }}>1</td>
-                <td>
-                  <b>Courier Doorstep Delivery & Transportation Fee</b>
-                  <div className="amz-table-sub">
-                    Consignment from: {order.pickup?.address ? order.pickup.address.split(',')[0] : 'Origin'} to {order.drop?.address ? order.drop.address.split(',')[0] : 'Destination'}
-                    {order.notes ? ` · Instruction: "${order.notes}"` : ''}
-                  </div>
-                </td>
-                <td>{order.pkg?.type || 'Standard'} ({order.pkg?.weight || 1} kg)</td>
-                <td style={{ textAlign: 'center' }}>1</td>
-                <td style={{ textAlign: 'right' }}>₹{deliveryFee.toFixed(2)}</td>
-                <td style={{ textAlign: 'right' }}>₹0.00</td>
-                <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{deliveryFee.toFixed(2)}</td>
-              </tr>
-
-              {itemValue > 0 && (
+          <div className="amz-table-wrap">
+            <table className="amz-table">
+              <thead>
                 <tr>
-                  <td style={{ textAlign: 'center' }}>2</td>
-                  <td>
-                    <b>Ordered Goods / Item Value</b>
-                    <div className="amz-table-sub">{order.itemDesc || 'Goods amount collected on delivery'}</div>
-                  </td>
-                  <td>Verified Item</td>
-                  <td style={{ textAlign: 'center' }}>1</td>
-                  <td style={{ textAlign: 'right' }}>₹{itemValue.toFixed(2)}</td>
-                  <td style={{ textAlign: 'right' }}>₹0.00</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{itemValue.toFixed(2)}</td>
+                  <th style={{ width: '40px', textAlign: 'center' }}>Sl.</th>
+                  <th>Description</th>
+                  <th style={{ width: '130px' }}>Type / Weight</th>
+                  <th style={{ width: '50px', textAlign: 'center' }}>Qty</th>
+                  <th style={{ width: '100px', textAlign: 'right' }}>Gross (₹)</th>
+                  <th style={{ width: '90px', textAlign: 'right' }}>Tax (₹)</th>
+                  <th style={{ width: '110px', textAlign: 'right' }}>Total (₹)</th>
                 </tr>
-              )}
-
-              {order.status === 'Cancelled' && (
+              </thead>
+              <tbody>
                 <tr>
-                  <td style={{ textAlign: 'center' }}>3</td>
-                  <td>
-                    <b>Order Cancellation Fee</b>
-                    <div className="amz-table-sub">Mandatory processing fee as per policy</div>
-                  </td>
-                  <td>Service Charge</td>
                   <td style={{ textAlign: 'center' }}>1</td>
-                  <td style={{ textAlign: 'right' }}>₹{Number(order.cancellationFeeApplied || order.cancellationFee || 30).toFixed(2)}</td>
+                  <td>
+                    <b>Courier Doorstep Delivery & Transportation Fee</b>
+                    <div className="amz-table-sub">
+                      Consignment from: {order.pickup?.address ? order.pickup.address.split(',')[0] : 'Origin'} to {order.drop?.address ? order.drop.address.split(',')[0] : 'Destination'}
+                      {order.notes ? ` · Instruction: "${order.notes}"` : ''}
+                    </div>
+                  </td>
+                  <td>{order.pkg?.type || 'Standard'} ({order.pkg?.weight || 1} kg)</td>
+                  <td style={{ textAlign: 'center' }}>1</td>
+                  <td style={{ textAlign: 'right' }}>₹{deliveryFee.toFixed(2)}</td>
                   <td style={{ textAlign: 'right' }}>₹0.00</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{Number(order.cancellationFeeApplied || order.cancellationFee || 30).toFixed(2)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{deliveryFee.toFixed(2)}</td>
                 </tr>
-              )}
 
-              {/* Total Row */}
-              <tr className="amz-total-row">
-                <td colSpan="4" style={{ textAlign: 'right', fontWeight: 700 }}>
-                  TOTAL AMOUNT {isPaid ? 'PAID' : 'PAYABLE'}:
-                </td>
-                <td colSpan="3" style={{ textAlign: 'right', fontWeight: 900, fontSize: 16 }}>
-                  ₹{totalAmount}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                {itemValue > 0 && (
+                  <tr>
+                    <td style={{ textAlign: 'center' }}>2</td>
+                    <td>
+                      <b>Ordered Goods / Item Value</b>
+                      <div className="amz-table-sub">{order.itemDesc || 'Goods amount collected on delivery'}</div>
+                    </td>
+                    <td>Verified Item</td>
+                    <td style={{ textAlign: 'center' }}>1</td>
+                    <td style={{ textAlign: 'right' }}>₹{itemValue.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right' }}>₹0.00</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{itemValue.toFixed(2)}</td>
+                  </tr>
+                )}
+
+                {order.status === 'Cancelled' && (
+                  <tr>
+                    <td style={{ textAlign: 'center' }}>3</td>
+                    <td>
+                      <b>Order Cancellation Fee</b>
+                      <div className="amz-table-sub">Mandatory processing fee as per policy</div>
+                    </td>
+                    <td>Service Charge</td>
+                    <td style={{ textAlign: 'center' }}>1</td>
+                    <td style={{ textAlign: 'right' }}>₹{Number(order.cancellationFeeApplied || order.cancellationFee || 30).toFixed(2)}</td>
+                    <td style={{ textAlign: 'right' }}>₹0.00</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{Number(order.cancellationFeeApplied || order.cancellationFee || 30).toFixed(2)}</td>
+                  </tr>
+                )}
+
+                {/* Total Row */}
+                <tr className="amz-total-row">
+                  <td colSpan="4" style={{ textAlign: 'right', fontWeight: 700 }}>
+                    TOTAL AMOUNT {isPaid ? 'PAID' : 'PAYABLE'}:
+                  </td>
+                  <td colSpan="3" style={{ textAlign: 'right', fontWeight: 900, fontSize: 16 }}>
+                    ₹{totalAmount}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           {/* Amount in Words */}
           <div className="amz-words-row">
@@ -384,4 +387,6 @@ export default function ShipmentReceiptModal({ order, isOpen, onClose }) {
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 }

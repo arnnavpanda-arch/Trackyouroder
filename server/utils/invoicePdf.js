@@ -30,7 +30,7 @@ function numberToWordsINR(num) {
 }
 
 /**
- * Format date nicely
+ * Format date nicely: e.g. "25 Nov, 01:24 pm"
  */
 function formatDate(d) {
   try {
@@ -38,7 +38,6 @@ function formatDate(d) {
     return date.toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
-      year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
@@ -49,7 +48,7 @@ function formatDate(d) {
 }
 
 /**
- * Generate official Tax Invoice PDF buffer matching the customer dashboard receipt
+ * Generate official Tax Invoice PDF buffer matching the attached template exactly
  * @param {Object} order
  * @param {string} recipientEmail
  * @returns {Promise<Buffer>}
@@ -62,7 +61,7 @@ export async function generateInvoicePdfBuffer(order, recipientEmail) {
     // Graceful fallback if database lookup fails
   }
 
-  const companyName = settings?.company_name || 'Delivery Tracker Logistics Services Pvt. Ltd.';
+  const companyName = settings?.company_name || 'Trackora Express Logistics';
   const companyAddress = settings?.company_address || 'Plot No. 42, Tech Logistics Park, Saheed Nagar, Bhubaneswar, Odisha - 751007, India';
   const companyPan = settings?.company_pan || 'AABCD1234E';
   const companyGstin = settings?.company_gstin || '21AABCD1234E1Z5';
@@ -101,245 +100,343 @@ export async function generateInvoicePdfBuffer(order, recipientEmail) {
       ).toFixed(2);
       const isPaid = order.paymentStatus === 'paid' || order.paymentStatus === 'verified' || order.status === 'Cancelled';
 
-      // --- Top Accent Bar ---
-      doc.rect(startX, y, contentWidth, 4).fill('#0284c7');
-      y += 12;
-
-      // --- Brand & Document Header (Matches Customer Dashboard) ---
+      // =========================================================================
+      // 1. TOP HEADER: BRAND ON LEFT, INVOICE METADATA ON RIGHT (Clean Monochrome)
+      // =========================================================================
       const brandHeader = companyName.toUpperCase();
-      doc.fillColor('#0f172a').fontSize(brandHeader.length > 30 ? 15 : 18).font('Helvetica-Bold')
-        .text(brandHeader, startX, y, { width: 280, lineBreak: false });
-      doc.fillColor('#0284c7').fontSize(9.5).font('Helvetica-Bold')
-        .text('Tax Invoice / Bill of Supply / Consignment Note', startX, y + 21);
-      doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-        .text('(Original for Recipient)', startX, y + 33);
+      doc.fillColor('#000000').fontSize(brandHeader.length > 28 ? 14 : 16).font('Helvetica-Bold')
+        .text(brandHeader, startX, y, { width: 310, lineBreak: false });
+      
+      doc.fillColor('#111111').fontSize(9.5).font('Helvetica-Bold')
+        .text('Tax Invoice / Bill of Supply / Consignment Note', startX, y + 20);
+      
+      doc.fillColor('#666666').fontSize(7.5).font('Helvetica')
+        .text('(Original for Recipient)', startX, y + 32);
 
       // Top Right Document Metadata
-      const rightX = startX + 290;
-      const rightWidth = contentWidth - 290;
-      doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
-        .text(`Invoice Number: DT-INV-${order.id}`, rightX, y, { align: 'right', width: rightWidth });
-      doc.fillColor('#334155').fontSize(8).font('Helvetica')
-        .text(`Invoice Date: ${formatDate(order.createdAt)}`, rightX, y + 12, { align: 'right', width: rightWidth })
-        .text(`Order ID: #${order.id}`, rightX, y + 24, { align: 'right', width: rightWidth });
-      
-      const statusColor = order.status === 'Cancelled' ? '#b91c1c' : order.status === 'Delivered' ? '#166534' : '#0284c7';
-      doc.fillColor(statusColor).fontSize(8.5).font('Helvetica-Bold')
-        .text(`Order Status: ${(order.status || 'Placed').toUpperCase()}`, rightX, y + 36, { align: 'right', width: rightWidth });
+      const rightX = startX + 310;
+      const rightWidth = contentWidth - 310;
+      const metaY = y;
+      doc.fontSize(8);
 
-      y += 50;
+      // Line 1: Invoice Number
+      doc.fillColor('#000000').font('Helvetica-Bold')
+        .text('Invoice Number: ', rightX, metaY, { continued: true, align: 'right', width: rightWidth })
+        .font('Helvetica').text(`DT-INV-${order.id}`);
 
-      // Divider Line
-      doc.strokeColor('#cbd5e1').lineWidth(0.8).moveTo(startX, y).lineTo(startX + contentWidth, y).stroke();
+      // Line 2: Invoice Date
+      doc.font('Helvetica-Bold')
+        .text('Invoice Date: ', rightX, metaY + 11.5, { continued: true, align: 'right', width: rightWidth })
+        .font('Helvetica').text(formatDate(order.createdAt));
+
+      // Line 3: Order ID
+      doc.font('Helvetica-Bold')
+        .text('Order ID: ', rightX, metaY + 23, { continued: true, align: 'right', width: rightWidth })
+        .font('Helvetica').text(`#${order.id}`);
+
+      // Line 4: Order Status
+      doc.font('Helvetica-Bold')
+        .text('Order Status: ', rightX, metaY + 34.5, { continued: true, align: 'right', width: rightWidth })
+        .font('Helvetica-Bold').text((order.status || 'Placed').toUpperCase());
+
+      y += 48;
+
+      // Full-width black divider line
+      doc.strokeColor('#000000').lineWidth(0.8).moveTo(startX, y).lineTo(startX + contentWidth, y).stroke();
       y += 8;
 
-      // --- Two-Column Address Box (Sold By & Consignee) ---
-      const colWidth = (contentWidth - 10) / 2;
-      const boxHeight = 88;
+      // =========================================================================
+      // 2. TWO-COLUMN ADDRESS BOX (Sold By & Consignee Details)
+      // =========================================================================
+      const colW = contentWidth / 2; // 261.64 pt
+      const addrBoxH = 88;
 
-      // Left Box: Sold By & Dispatched By (Dynamic from Admin System Settings)
-      doc.rect(startX, y, colWidth, boxHeight).fillAndStroke('#f8fafc', '#e2e8f0');
-      doc.fillColor('#0284c7').fontSize(8).font('Helvetica-Bold').text('SOLD BY & DISPATCHED BY:', startX + 8, y + 8);
-      doc.fillColor('#0f172a').fontSize(8).font('Helvetica-Bold')
-        .text(companyName, startX + 8, y + 19, { width: colWidth - 16, lineBreak: false });
+      // Outer border
+      doc.rect(startX, y, contentWidth, addrBoxH).strokeColor('#000000').lineWidth(0.8).stroke();
+      // Center vertical divider
+      doc.moveTo(startX + colW, y).lineTo(startX + colW, y + addrBoxH).strokeColor('#000000').lineWidth(0.8).stroke();
+
+      // Left Column: Sold By & Dispatched By
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold')
+        .text('SOLD BY & DISPATCHED BY:', startX + 8, y + 8);
       
-      doc.fillColor('#475569').fontSize(7.3).font('Helvetica')
-        .text(companyAddress, startX + 8, y + 30, { width: colWidth - 16, height: 22, ellipsis: true })
-        .text(`PAN: ${companyPan} | GSTIN: ${companyGstin}`, startX + 8, y + 53)
-        .text(`Carrier: ${order.agentName ? `${order.agentName} (Assigned Agent)` : `${companyName} Express Agent`}`, startX + 8, y + 64, { width: colWidth - 16, lineBreak: false })
-        .text(`Support Email: ${supportEmail}`, startX + 8, y + 74);
+      doc.fontSize(8.5).font('Helvetica-Bold')
+        .text(companyName, startX + 8, y + 20, { width: colW - 16, lineBreak: false });
 
-      // Right Box: Shipping & Consignee Details
-      const box2X = startX + colWidth + 10;
-      doc.rect(box2X, y, colWidth, boxHeight).fillAndStroke('#f8fafc', '#e2e8f0');
-      doc.fillColor('#0284c7').fontSize(8).font('Helvetica-Bold').text('SHIPPING & CONSIGNEE DETAILS:', box2X + 8, y + 8);
-      doc.fillColor('#0f172a').fontSize(8).font('Helvetica-Bold').text(order.userName || 'Customer', box2X + 8, y + 19);
+      doc.fillColor('#222222').fontSize(7.2).font('Helvetica')
+        .text(companyAddress, startX + 8, y + 32, { width: colW - 16, height: 20, ellipsis: true })
+        .text(`PAN: ${companyPan} | GSTIN: ${companyGstin}`, startX + 8, y + 54)
+        .text(`Courier Carrier: ${order.agentName ? `${order.agentName} (Assigned Agent)` : `${companyName} Express Agent`}`, startX + 8, y + 65, { width: colW - 16, lineBreak: false });
+
+      // Right Column: Shipping & Consignee Details
+      const rightColX = startX + colW;
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold')
+        .text('SHIPPING & CONSIGNEE DETAILS:', rightColX + 8, y + 8);
+
+      doc.fontSize(8.5).font('Helvetica-Bold')
+        .text(order.userName || 'Customer', rightColX + 8, y + 20, { width: colW - 16, lineBreak: false });
 
       const email = recipientEmail || order.userEmail || 'Registered Account';
-      const dropAddr = (order.drop?.address || 'Designated Destination').substring(0, 52);
-      const pickAddr = (order.pickup?.address || 'Designated Station').substring(0, 52);
+      const dropAddr = (order.drop?.address || 'Designated Destination');
+      const pickAddr = (order.pickup?.address || 'Designated Station');
 
-      doc.fillColor('#475569').fontSize(7.4).font('Helvetica')
-        .text(`Delivery Drop: ${dropAddr}`, box2X + 8, y + 30, { width: colWidth - 16, lineBreak: false })
-        .text(`Pickup Station: ${pickAddr}`, box2X + 8, y + 41, { width: colWidth - 16, lineBreak: false })
-        .text(`Registered Email: ${email}`, box2X + 8, y + 52)
-        .text(`Payer: ${order.payerName || order.accountHolderName || order.userName || 'Customer'}`, box2X + 8, y + 63)
-        .text('Place of Supply: Odisha (State Code 21)', box2X + 8, y + 74);
+      doc.fillColor('#222222').fontSize(7.2).font('Helvetica')
+        .text(`Delivery Drop: ${dropAddr.substring(0, 52)}`, rightColX + 8, y + 32, { width: colW - 16, lineBreak: false });
 
-      y += boxHeight + 8;
+      if (order.drop?.lat != null && order.drop?.lng != null) {
+        doc.fillColor('#555555').fontSize(6.8).font('Helvetica')
+          .text(`GPS: ${Number(order.drop.lat).toFixed(5)}, ${Number(order.drop.lng).toFixed(5)}${order.drop?.mapLink ? ' (Google Maps Linked)' : ''}`, rightColX + 8, y + 43, { width: colW - 16, lineBreak: false });
+      } else {
+        doc.fillColor('#555555').fontSize(6.8).font('Helvetica')
+          .text('GPS: Coordinates linked on pickup', rightColX + 8, y + 43);
+      }
 
-      // --- Shipment Reference Bar ---
-      const refBarHeight = 18;
-      doc.rect(startX, y, contentWidth, refBarHeight).fillAndStroke('#f1f5f9', '#cbd5e1');
-      doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold');
-      
+      doc.fillColor('#222222').fontSize(7.2).font('Helvetica')
+        .text(`Pickup Station: ${pickAddr.substring(0, 52)}`, rightColX + 8, y + 53, { width: colW - 16, lineBreak: false })
+        .text(`Registered Email: ${email}`, rightColX + 8, y + 63, { width: colW - 16, lineBreak: false })
+        .text(`Payer: ${order.payerName || order.accountHolderName || order.userName || 'Customer'} | State Code: 21 (Odisha)`, rightColX + 8, y + 73, { width: colW - 16, lineBreak: false });
+
+      y += addrBoxH;
+
+      // =========================================================================
+      // 3. SHIPMENT & CONSIGNMENT REFERENCE BAR (Connected Directly Underneath)
+      // =========================================================================
+      const refH = 17;
+      doc.rect(startX, y, contentWidth, refH).strokeColor('#000000').lineWidth(0.8).stroke();
+
+      doc.fillColor('#111111').fontSize(7.2);
       const pkgTypeStr = `${order.pkg?.type || 'Standard'} (${order.pkg?.weight || 1} kg)`;
+      const pkgDescStr = order.pkg?.desc || `${order.pkg?.type || 'Standard'} Package`;
       const pMethod = order.paymentMethod === 'card' ? 'Credit/Debit Card' : order.paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : order.paymentMethod === 'pay_on_pickup' ? 'Pay on Pickup' : 'PhonePe / UPI';
       const pStatus = isPaid ? 'PAID & VERIFIED' : order.paymentStatus === 'not_verified' ? 'NOT VERIFIED' : 'PENDING';
 
-      doc.text(`Package: ${pkgTypeStr}`, startX + 8, y + 5, { width: 130, lineBreak: false });
-      doc.text(`Desc: ${(order.pkg?.desc || 'Parcel / Consignment').substring(0, 24)}`, startX + 140, y + 5, { width: 135, lineBreak: false });
-      doc.text(`Payment: ${pMethod}`, startX + 280, y + 5, { width: 125, lineBreak: false });
-      doc.text(`State: ${pStatus}`, startX + 410, y + 5, { width: 105, lineBreak: false });
+      const s1 = startX + 6;
+      const s2 = startX + 130;
+      const s3 = startX + 260;
+      const s4 = startX + 385;
 
-      y += refBarHeight + 8;
+      doc.font('Helvetica-Bold').text('Package: ', s1, y + 4.5, { continued: true }).font('Helvetica').text(pkgTypeStr);
+      doc.font('Helvetica-Bold').text('Description: ', s2, y + 4.5, { continued: true }).font('Helvetica').text(pkgDescStr.substring(0, 22));
+      doc.font('Helvetica-Bold').text('Payment Method: ', s3, y + 4.5, { continued: true }).font('Helvetica').text(pMethod);
+      doc.font('Helvetica-Bold').text('Payment State: ', s4, y + 4.5, { continued: true }).font('Helvetica').text(pStatus);
 
-      // --- Itemized Table ---
+      y += refH + 10;
+
+      // =========================================================================
+      // 4. ITEMIZED TABLE (White Background, Clean Black Outlines & Vertical Lines)
+      // =========================================================================
+      // Column widths: Sl (25) + Description (228) + Type/Weight (90) + Qty (26) + Gross (50) + Tax (45) + Total (59.28) = 523.28
+      const colDefs = [
+        { key: 'sl', label: 'Sl.', w: 25, align: 'center' },
+        { key: 'desc', label: 'Description', w: 228, align: 'left' },
+        { key: 'type', label: 'Type / Weight', w: 90, align: 'center' },
+        { key: 'qty', label: 'Qty', w: 26, align: 'center' },
+        { key: 'gross', label: 'Gross (₹)', w: 50, align: 'right' },
+        { key: 'tax', label: 'Tax (₹)', w: 45, align: 'right' },
+        { key: 'total', label: 'Total (₹)', w: 59.28, align: 'right' },
+      ];
+
       const thHeight = 18;
-      doc.rect(startX, y, contentWidth, thHeight).fill('#0f172a');
-      doc.fillColor('#ffffff').fontSize(7.5).font('Helvetica-Bold');
-      doc.text('SL', startX + 6, y + 5, { width: 22, align: 'center' });
-      doc.text('DESCRIPTION OF SERVICE / GOODS', startX + 32, y + 5, { width: 225 });
-      doc.text('TYPE / WEIGHT', startX + 262, y + 5, { width: 85, align: 'center' });
-      doc.text('QTY', startX + 352, y + 5, { width: 25, align: 'center' });
-      doc.text('GROSS (₹)', startX + 382, y + 5, { width: 45, align: 'right' });
-      doc.text('TAX (₹)', startX + 432, y + 5, { width: 35, align: 'right' });
-      doc.text('TOTAL (₹)', startX + 472, y + 5, { width: 45, align: 'right' });
+      // Header rectangle
+      doc.rect(startX, y, contentWidth, thHeight).strokeColor('#000000').lineWidth(0.8).stroke();
+
+      // Header column text & vertical dividers
+      let curX = startX;
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+      colDefs.forEach((col, idx) => {
+        const textPad = col.align === 'left' ? 6 : 0;
+        doc.text(col.label, curX + textPad, y + 5, { width: col.w - (col.align === 'left' ? 12 : 0), align: col.align });
+        curX += col.w;
+        if (idx < colDefs.length - 1) {
+          doc.moveTo(curX, y).lineTo(curX, y + thHeight).strokeColor('#000000').lineWidth(0.8).stroke();
+        }
+      });
 
       y += thHeight;
 
+      // Helper function to render a table row with vertical dividers
+      const renderTableRow = (rowHeight, cells) => {
+        doc.rect(startX, y, contentWidth, rowHeight).strokeColor('#000000').lineWidth(0.8).stroke();
+        let rX = startX;
+        colDefs.forEach((col, idx) => {
+          if (idx < colDefs.length - 1) {
+            doc.moveTo(rX + col.w, y).lineTo(rX + col.w, y + rowHeight).strokeColor('#000000').lineWidth(0.8).stroke();
+          }
+          rX += col.w;
+        });
+
+        // Cell 0: Sl.
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica').text(cells.sl, startX, y + 6, { width: colDefs[0].w, align: 'center' });
+
+        // Cell 1: Description
+        doc.font('Helvetica-Bold').text(cells.descTitle, startX + 6, y + 5, { width: colDefs[1].w - 12 });
+        if (cells.descSub) {
+          doc.fillColor('#555555').fontSize(6.8).font('Helvetica').text(cells.descSub, startX + 6, y + 15, { width: colDefs[1].w - 12, lineBreak: false });
+        }
+
+        // Cell 2: Type / Weight
+        doc.fillColor('#000000').fontSize(7.2).font('Helvetica').text(cells.type, startX + colDefs[0].w + colDefs[1].w, y + 7, { width: colDefs[2].w, align: 'center' });
+
+        // Cell 3: Qty
+        doc.text(cells.qty, startX + colDefs[0].w + colDefs[1].w + colDefs[2].w, y + 7, { width: colDefs[3].w, align: 'center' });
+
+        // Cell 4: Gross
+        const grossX = startX + colDefs[0].w + colDefs[1].w + colDefs[2].w + colDefs[3].w;
+        doc.text(cells.gross, grossX, y + 7, { width: colDefs[4].w - 4, align: 'right' });
+
+        // Cell 5: Tax
+        const taxX = grossX + colDefs[4].w;
+        doc.text(cells.tax, taxX, y + 7, { width: colDefs[5].w - 4, align: 'right' });
+
+        // Cell 6: Total
+        const totX = taxX + colDefs[5].w;
+        doc.font('Helvetica-Bold').text(cells.total, totX, y + 7, { width: colDefs[6].w - 4, align: 'right' });
+
+        y += rowHeight;
+      };
+
       // Row 1: Courier Doorstep Delivery & Transportation Fee
-      const row1Height = 28;
-      doc.rect(startX, y, contentWidth, row1Height).fillAndStroke('#ffffff', '#e2e8f0');
-      doc.fillColor('#0f172a').fontSize(8).font('Helvetica-Bold').text('1', startX + 6, y + 6, { width: 22, align: 'center' });
-      doc.text('Courier Doorstep Delivery & Transportation Fee', startX + 32, y + 6);
-      doc.fillColor('#64748b').fontSize(7).font('Helvetica')
-        .text(`Consignment from: ${pickAddr.split(',')[0]} to ${dropAddr.split(',')[0]}`, startX + 32, y + 16, { width: 225, lineBreak: false });
+      renderTableRow(26, {
+        sl: '1',
+        descTitle: 'Courier Doorstep Delivery & Transportation Fee',
+        descSub: `Consignment from: ${pickAddr.split(',')[0]} to ${dropAddr.split(',')[0]}`,
+        type: pkgTypeStr,
+        qty: '1',
+        gross: `₹${deliveryFee.toFixed(2)}`,
+        tax: '₹0.00',
+        total: `₹${deliveryFee.toFixed(2)}`,
+      });
 
-      doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica').text(pkgTypeStr, startX + 262, y + 9, { width: 85, align: 'center' });
-      doc.text('1', startX + 352, y + 9, { width: 25, align: 'center' });
-      doc.text(`₹${deliveryFee.toFixed(2)}`, startX + 382, y + 9, { width: 45, align: 'right' });
-      doc.text('₹0.00', startX + 432, y + 9, { width: 35, align: 'right' });
-      doc.font('Helvetica-Bold').text(`₹${deliveryFee.toFixed(2)}`, startX + 472, y + 9, { width: 45, align: 'right' });
-
-      y += row1Height;
-
-      // Row 2: Item Value if present
+      // Row 2: Ordered Goods / Item Value (if present)
       if (itemValue > 0) {
-        const row2Height = 26;
-        doc.rect(startX, y, contentWidth, row2Height).fillAndStroke('#ffffff', '#e2e8f0');
-        doc.fillColor('#0f172a').fontSize(8).font('Helvetica-Bold').text('2', startX + 6, y + 5, { width: 22, align: 'center' });
-        doc.text('Ordered Goods / Item Value', startX + 32, y + 5);
-        doc.fillColor('#64748b').fontSize(7).font('Helvetica')
-          .text(order.itemDesc || 'Goods amount collected on delivery', startX + 32, y + 15, { width: 225, lineBreak: false });
-
-        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica').text('Verified Item', startX + 262, y + 8, { width: 85, align: 'center' });
-        doc.text('1', startX + 352, y + 8, { width: 25, align: 'center' });
-        doc.text(`₹${itemValue.toFixed(2)}`, startX + 382, y + 8, { width: 45, align: 'right' });
-        doc.text('₹0.00', startX + 432, y + 8, { width: 35, align: 'right' });
-        doc.font('Helvetica-Bold').text(`₹${itemValue.toFixed(2)}`, startX + 472, y + 8, { width: 45, align: 'right' });
-
-        y += row2Height;
+        renderTableRow(24, {
+          sl: '2',
+          descTitle: 'Ordered Goods / Item Value',
+          descSub: order.itemDesc || 'Goods amount collected on delivery',
+          type: 'Verified Item',
+          qty: '1',
+          gross: `₹${itemValue.toFixed(2)}`,
+          tax: '₹0.00',
+          total: `₹${itemValue.toFixed(2)}`,
+        });
       }
 
-      // Row 3: Cancellation Fee if Cancelled
+      // Row 3: Order Cancellation Processing Fee (if Cancelled)
       if (order.status === 'Cancelled') {
-        const row3Height = 26;
-        doc.rect(startX, y, contentWidth, row3Height).fillAndStroke('#ffffff', '#e2e8f0');
-        doc.fillColor('#0f172a').fontSize(8).font('Helvetica-Bold').text('3', startX + 6, y + 5, { width: 22, align: 'center' });
-        doc.text('Order Cancellation Processing Fee', startX + 32, y + 5);
-        doc.fillColor('#64748b').fontSize(7).font('Helvetica')
-          .text('Mandatory processing fee as per policy', startX + 32, y + 15);
-
-        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica').text('Service Charge', startX + 262, y + 8, { width: 85, align: 'center' });
-        doc.text('1', startX + 352, y + 8, { width: 25, align: 'center' });
-        doc.text(`₹${cancellationFee.toFixed(2)}`, startX + 382, y + 8, { width: 45, align: 'right' });
-        doc.text('₹0.00', startX + 432, y + 8, { width: 35, align: 'right' });
-        doc.font('Helvetica-Bold').text(`₹${cancellationFee.toFixed(2)}`, startX + 472, y + 8, { width: 45, align: 'right' });
-
-        y += row3Height;
+        renderTableRow(24, {
+          sl: '3',
+          descTitle: 'Order Cancellation Processing Fee',
+          descSub: 'Mandatory processing fee as per policy',
+          type: 'Service Charge',
+          qty: '1',
+          gross: `₹${cancellationFee.toFixed(2)}`,
+          tax: '₹0.00',
+          total: `₹${cancellationFee.toFixed(2)}`,
+        });
       }
 
-      // Total Row
-      const totalRowHeight = 22;
-      doc.rect(startX, y, contentWidth, totalRowHeight).fillAndStroke('#f0fdf4', '#86efac');
-      doc.fillColor('#166534').fontSize(8.5).font('Helvetica-Bold')
-        .text(`TOTAL AMOUNT ${isPaid ? 'PAID' : 'PAYABLE'}:`, startX + 80, y + 6, { width: 350, align: 'right' });
-      doc.fontSize(11).font('Helvetica-Bold')
-        .text(`₹${totalAmount}`, startX + 435, y + 5, { width: 82, align: 'right' });
+      // TOTAL AMOUNT ROW (Exactly as shown in image)
+      const totH = 24;
+      doc.rect(startX, y, contentWidth, totH).strokeColor('#000000').lineWidth(0.8).stroke();
 
-      y += totalRowHeight + 8;
+      // Divider line separating the total label from the total amount box
+      const totalColEnd = startX + contentWidth - colDefs[6].w;
+      doc.moveTo(totalColEnd, y).lineTo(totalColEnd, y + totH).strokeColor('#000000').lineWidth(0.8).stroke();
 
-      // Amount in Words
-      doc.rect(startX, y, contentWidth, 18).fillAndStroke('#f8fafc', '#e2e8f0');
-      doc.fillColor('#0284c7').fontSize(7.5).font('Helvetica-Bold').text('AMOUNT IN WORDS: ', startX + 8, y + 5, { continued: true });
-      doc.fillColor('#0f172a').font('Helvetica').text(numberToWordsINR(totalAmount));
+      // "TOTAL AMOUNT PAYABLE:" text aligned right before the last column
+      doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
+        .text(`TOTAL AMOUNT ${isPaid ? 'PAID' : 'PAYABLE'}:`, startX + 50, y + 8, { width: totalColEnd - startX - 58, align: 'right' });
 
-      y += 26;
+      // Big Bold Total in last column
+      doc.fillColor('#000000').fontSize(12).font('Helvetica-Bold')
+        .text(`₹${totalAmount}`, totalColEnd, y + 6, { width: colDefs[6].w - 4, align: 'right' });
+
+      y += totH + 8;
 
       // =========================================================================
-      // THREE-COLUMN SECTION: PAYMENT REFERENCE + WORKABLE BARCODE + WORKABLE QR
+      // 5. AMOUNT IN WORDS
       // =========================================================================
-      const tripleHeight = 88;
-      const col1W = 160;
-      const col2W = 222;
-      const col3W = contentWidth - col1W - col2W - 14; // 127.28 pt
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold')
+        .text('Amount in Words: ', startX, y, { continued: true })
+        .font('Helvetica').text(numberToWordsINR(totalAmount));
 
-      // --- Column 1: Payment Transaction Reference ---
-      doc.rect(startX, y, col1W, tripleHeight).fillAndStroke('#f8fafc', '#e2e8f0');
-      doc.fillColor('#0284c7').fontSize(7.5).font('Helvetica-Bold').text('PAYMENT REFERENCE', startX + 8, y + 7);
-      
+      y += 11;
+      doc.strokeColor('#000000').lineWidth(0.8).moveTo(startX, y).lineTo(startX + contentWidth, y).stroke();
+      y += 12;
+
+      // =========================================================================
+      // 6. BOTTOM PAYMENT REFERENCE + BARCODE + QR BOX (Exact Match with Image)
+      // =========================================================================
+      const refBoxH = 88;
+      // Large outer box with clean black border
+      doc.rect(startX, y, contentWidth, refBoxH).strokeColor('#000000').lineWidth(0.8).stroke();
+
+      // Left Side: Payment Transaction Reference
       const txnRef = order.txnId || order.utrId || (order.paymentMethod === 'cod' ? 'COD Pending' : 'N/A');
-      const vStatus = isPaid ? 'CONFIRMED & VERIFIED' : order.paymentStatus === 'not_verified' ? 'NOT VERIFIED' : 'PENDING VERIFICATION';
+      const vStatus = isPaid ? 'CONFIRMED & VERIFIED' : order.paymentStatus === 'not_verified' ? 'NOT VERIFIED' : 'PENDING AGENT VERIFICATION';
 
-      doc.fillColor('#334155').fontSize(7.2).font('Helvetica')
-        .text('Payment Mode:', startX + 8, y + 20)
-        .font('Helvetica-Bold').text(pMethod, startX + 8, y + 30)
-        .font('Helvetica').text('Txn / UTR Reference:', startX + 8, y + 42)
-        .font('Helvetica-Bold').text(txnRef.substring(0, 24), startX + 8, y + 52)
-        .font('Helvetica').text('Status:', startX + 8, y + 64)
-        .font('Helvetica-Bold').fillColor(isPaid ? '#166534' : '#b45309').text(vStatus, startX + 8, y + 74);
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold')
+        .text('PAYMENT TRANSACTION REFERENCE:', startX + 12, y + 12);
 
-      // --- Column 2: WORKABLE Code 128 BARCODE for Delivery Order Details ---
-      const col2X = startX + col1W + 7;
-      doc.rect(col2X, y, col2W, tripleHeight).fillAndStroke('#ffffff', '#cbd5e1');
-      doc.fillColor('#0284c7').fontSize(7.5).font('Helvetica-Bold')
-        .text('DELIVERY ORDER BARCODE', col2X + 6, y + 6, { align: 'center', width: col2W - 12 });
-      doc.fillColor('#64748b').fontSize(6.5).font('Helvetica')
-        .text('Consignment Details & Carrier Sorting', col2X + 6, y + 16, { align: 'center', width: col2W - 12 });
+      doc.fillColor('#222222').fontSize(7.2)
+        .font('Helvetica').text('Method: ', startX + 12, y + 25, { continued: true }).font('Helvetica-Bold').text(pMethod)
+        .font('Helvetica').text('Txn / UTR Ref: ', startX + 12, y + 37, { continued: true }).font('Helvetica-Bold').text(txnRef.substring(0, 28))
+        .font('Helvetica').text('Verification: ', startX + 12, y + 49, { continued: true }).font('Helvetica-Bold').text(vStatus);
+
+      // Right Side: DELIVERY ORDER BARCODE CARD + PAYMENT & DETAILS QR CARD
+      const cardY = y + 7;
+      const cardH = 74;
+
+      // --- Sub-Card 1: Delivery Order Barcode Card ---
+      const card1W = 148;
+      const card1X = startX + contentWidth - 252;
+      doc.rect(card1X, cardY, card1W, cardH).strokeColor('#cbd5e1').lineWidth(0.8).stroke();
+
+      // Badge: DELIVERY ORDER BARCODE
+      doc.fillColor('#0284c7').fontSize(6.5).font('Helvetica-Bold')
+        .text('DELIVERY ORDER BARCODE', card1X + 4, cardY + 5, { align: 'center', width: card1W - 8 });
 
       const barcodeValue = `DT-${order.id}`;
       try {
-        const { bars, totalWidth } = getBarcodeBars(barcodeValue, 1.15, 6);
-        const barcodeStartX = col2X + Math.max(4, Math.floor((col2W - totalWidth) / 2));
-        const barcodeY = y + 27;
-        const barcodeH = 34;
+        const { bars, totalWidth } = getBarcodeBars(barcodeValue, 1.05, 4);
+        const barcodeStartX = card1X + Math.max(4, Math.floor((card1W - totalWidth) / 2));
+        const barcodeY = cardY + 16;
+        const barcodeH = 28;
 
-        // Draw crisp vector barcode bars
         for (const bar of bars) {
           doc.rect(barcodeStartX + bar.x, barcodeY, bar.width, barcodeH).fill('#000000');
         }
 
-        // Barcode human readable text
-        doc.fillColor('#0f172a').fontSize(8).font('Courier-Bold')
-          .text(`*${barcodeValue}*`, col2X, barcodeY + barcodeH + 2, { align: 'center', width: col2W });
-        doc.fillColor('#475569').fontSize(6.5).font('Helvetica')
-          .text('Workable 1D Barcode for Delivery Details', col2X, barcodeY + barcodeH + 12, { align: 'center', width: col2W });
+        // Monospace text *DT-DL1037*
+        doc.fillColor('#000000').fontSize(7.2).font('Courier-Bold')
+          .text(`*${barcodeValue}*`, card1X, barcodeY + barcodeH + 2, { align: 'center', width: card1W });
+        
+        doc.fillColor('#555555').fontSize(6.2).font('Helvetica')
+          .text('Carrier Tracking & Sorting', card1X, barcodeY + barcodeH + 11, { align: 'center', width: card1W });
       } catch (bcErr) {
-        console.error('PDF Barcode render error:', bcErr);
-        doc.fillColor('#000000').fontSize(8).font('Courier').text(`*${barcodeValue}*`, col2X, y + 45, { align: 'center', width: col2W });
+        console.error('Barcode render error:', bcErr);
+        doc.fillColor('#000000').fontSize(7.5).font('Courier').text(`*${barcodeValue}*`, card1X, cardY + 30, { align: 'center', width: card1W });
       }
 
-      // --- Column 3: WORKABLE QR CODE for Payment Pay & Other Details ---
-      const col3X = col2X + col2W + 7;
-      doc.rect(col3X, y, col3W, tripleHeight).fillAndStroke('#ffffff', '#cbd5e1');
-      doc.fillColor('#0284c7').fontSize(7.2).font('Helvetica-Bold')
-        .text('PAYMENT & ORDER QR', col3X + 4, y + 6, { align: 'center', width: col3W - 8 });
+      // --- Sub-Card 2: Payment & Details QR Card ---
+      const card2W = 94;
+      const card2X = card1X + card1W + 8;
+      doc.rect(card2X, cardY, card2W, cardH).strokeColor('#cbd5e1').lineWidth(0.8).stroke();
+
+      // Badge: PAYMENT & DETAILS QR
+      doc.fillColor('#0284c7').fontSize(6.5).font('Helvetica-Bold')
+        .text('PAYMENT & DETAILS QR', card2X + 2, cardY + 5, { align: 'center', width: card2W - 4 });
 
       const payAndDetailsUrl = `${clientOrigin}/pay/demo?orderId=${order.id}&amount=${totalAmount}&customer=${encodeURIComponent(order.userName || 'Customer')}`;
       try {
         const qrMatrix = generateQRMatrix(payAndDetailsUrl);
         if (qrMatrix && qrMatrix.length > 0) {
           const modCount = qrMatrix.length;
-          const cellSize = 1.6; // 29 * 1.6 = 46.4 pt
+          const cellSize = 1.35; // 29 * 1.35 = ~39 pt
           const qrPixelSize = modCount * cellSize;
-          const qrStartX = col3X + Math.floor((col3W - qrPixelSize) / 2);
-          const qrStartY = y + 17;
+          const qrStartX = card2X + Math.floor((card2W - qrPixelSize) / 2);
+          const qrStartY = cardY + 16;
 
-          // Draw QR background
-          doc.rect(qrStartX - 2, qrStartY - 2, qrPixelSize + 4, qrPixelSize + 4).fill('#ffffff');
-
-          // Draw vector QR modules
           for (let r = 0; r < modCount; r++) {
             for (let c = 0; c < modCount; c++) {
               if (qrMatrix[r][c]) {
@@ -348,51 +445,56 @@ export async function generateInvoicePdfBuffer(order, recipientEmail) {
             }
           }
 
-          doc.fillColor('#166534').fontSize(6.5).font('Helvetica-Bold')
-            .text(isPaid ? '✓ Paid & Verified' : `Scan to Pay ₹${totalAmount}`, col3X + 2, qrStartY + qrPixelSize + 4, { align: 'center', width: col3W - 4 });
-          doc.fillColor('#64748b').fontSize(5.8).font('Helvetica')
-            .text('UPI / PhonePe Gateway', col3X + 2, qrStartY + qrPixelSize + 13, { align: 'center', width: col3W - 4 });
+          doc.fillColor(isPaid ? '#166534' : '#0284c7').fontSize(6.2).font('Helvetica-Bold')
+            .text(isPaid ? '✓ Paid & Verified' : `Scan to Pay ₹${totalAmount}`, card2X + 2, qrStartY + qrPixelSize + 4, { align: 'center', width: card2W - 4 });
         }
       } catch (qrErr) {
-        console.error('PDF QR render error:', qrErr);
+        console.error('QR render error:', qrErr);
       }
 
-      y += tripleHeight + 8;
+      y += refBoxH + 12;
 
-      // --- Declaration & Signatory (Dynamic Company Name & Address) ---
-      const decHeight = 54;
+      // =========================================================================
+      // 7. DECLARATION & AUTHORIZED SIGNATORY (Exact Match with Image)
+      // =========================================================================
       const decLeftW = 345;
       const decRightW = contentWidth - decLeftW - 10;
 
-      // Left: Declaration Box
-      doc.rect(startX, y, decLeftW, decHeight).fillAndStroke('#ffffff', '#e2e8f0');
-      doc.fillColor('#334155').fontSize(7.2).font('Helvetica-Bold').text('DECLARATION & TERMS:', startX + 8, y + 6);
-      doc.fillColor('#64748b').fontSize(6.8).font('Helvetica')
-        .text('1. We declare that this invoice shows the actual price of the goods & delivery services described and all particulars are true and correct.', startX + 8, y + 17, { width: decLeftW - 16 })
-        .text('2. Whether tax is payable under reverse charge: No.', startX + 8, y + 29)
-        .text(`3. Customer support & online tracking: ${supportEmail} · ${trackingUrl}`, startX + 8, y + 39, { width: decLeftW - 16 });
+      // Left: Declaration Text
+      doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold')
+        .text('Declaration:', startX, y);
 
-      // Right: Authorized Signatory Box
+      doc.fillColor('#444444').fontSize(6.8).font('Helvetica')
+        .text('We declare that this invoice shows the actual price of the goods / services described and that all particulars are true and correct. Whether tax is payable under reverse charge: No.', startX, y + 10, { width: decLeftW, lineBreak: true })
+        .text(`Customer support & tracking: ${supportEmail} - ${trackingUrl}`, startX, y + 29, { width: decLeftW, lineBreak: false });
+
+      // Right: For Trackora Express Logistics + Dashed Authorized Signatory Seal
       const decRightX = startX + decLeftW + 10;
-      doc.rect(decRightX, y, decRightW, decHeight).fillAndStroke('#fafafa', '#cbd5e1');
-      doc.fillColor('#0f172a').fontSize(6.8).font('Helvetica-Bold')
-        .text(`For ${companyName}`, decRightX + 4, y + 6, { align: 'center', width: decRightW - 8, lineBreak: false });
+      doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold')
+        .text(`For ${companyName}:`, decRightX, y, { align: 'right', width: decRightW });
 
-      // Digital Seal Stamp
-      doc.rect(decRightX + 16, y + 19, decRightW - 32, 28).dash(2, { space: 2 }).stroke('#64748b');
+      const sigBoxW = 120;
+      const sigBoxH = 26;
+      const sigBoxX = startX + contentWidth - sigBoxW;
+      const sigBoxY = y + 12;
+
+      // Dashed border box
+      doc.rect(sigBoxX, sigBoxY, sigBoxW, sigBoxH).dash(2, { space: 2 }).strokeColor('#94a3b8').stroke();
       doc.undash();
-      doc.fillColor('#0f172a').fontSize(7).font('Helvetica-Bold')
-        .text('AUTHORIZED SIGNATORY', decRightX + 16, y + 23, { align: 'center', width: decRightW - 32 });
-      doc.fillColor('#16a34a').fontSize(5.8).font('Helvetica')
-        .text('Digitally Signed & Validated', decRightX + 16, y + 33, { align: 'center', width: decRightW - 32 });
 
-      y += decHeight + 8;
+      doc.fillColor('#000000').fontSize(6.8).font('Helvetica-Bold')
+        .text('AUTHORIZED SIGNATORY', sigBoxX, sigBoxY + 5, { align: 'center', width: sigBoxW });
+      
+      doc.fillColor('#64748b').fontSize(5.6).font('Helvetica')
+        .text('Digitally Signed & Validated', sigBoxX, sigBoxY + 14, { align: 'center', width: sigBoxW });
 
-      // --- Footer Note ---
-      doc.fillColor('#64748b').fontSize(7).font('Helvetica')
-        .text('This is a computer-generated tax invoice and does not require a physical signature. Page 1 of 1.', startX, y, { align: 'center', width: contentWidth });
-      doc.fillColor('#94a3b8').fontSize(6.5).font('Helvetica')
-        .text(`© ${new Date().getFullYear()} ${companyName} | Original Tax Invoice for Consignment #${order.id}`, startX, y + 9, { align: 'center', width: contentWidth });
+      y += 48;
+
+      // =========================================================================
+      // 8. BOTTOM FOOTNOTE
+      // =========================================================================
+      doc.fillColor('#555555').fontSize(6.5).font('Helvetica')
+        .text(`This is a computer-generated tax invoice and does not require a physical signature. Page 1 of 1. © ${new Date().getFullYear()} ${companyName}.`, startX, y, { align: 'center', width: contentWidth });
 
       doc.end();
     } catch (err) {

@@ -840,24 +840,40 @@ textarea{resize:vertical}h1{font-size:1.65rem;letter-spacing:-.02em;font-weight:
 /* Demo Payment Gateway Modal & 3-Option Gateway Styles */
 .gateway-backdrop{
   position:fixed;
-  inset:0;
-  background:rgba(10,14,26,.65);
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  width:100vw;
+  height:100vh;
+  height:100dvh;
+  background:rgba(10,14,26,.75);
   backdrop-filter:blur(6px);
-  display:grid;
-  place-items:center;
-  z-index:999;
+  -webkit-backdrop-filter:blur(6px);
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  z-index:999999 !important;
   padding:16px;
+  box-sizing:border-box;
   animation:pop .15s ease-out;
+  overflow-y:auto;
 }
 .gateway-container{
   background:#fff;
-  width:410px;
-  max-width:96%;
-  padding:32px 26px;
+  width:100%;
+  max-width:410px;
+  margin:auto !important;
+  padding:32px 24px;
   border-radius:24px;
   text-align:center;
   position:relative;
+  box-sizing:border-box;
   box-shadow:0 25px 60px -15px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.05);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
 }
 .gateway-close-btn{
   position:absolute;
@@ -884,6 +900,10 @@ textarea{resize:vertical}h1{font-size:1.65rem;letter-spacing:-.02em;font-weight:
   display:flex;
   flex-direction:column;
   align-items:center;
+  justify-content:center;
+  width:100%;
+  text-align:center;
+  margin:0 auto;
 }
 .gateway-logo{
   display:flex;
@@ -2745,6 +2765,13 @@ textarea{resize:vertical}h1{font-size:1.65rem;letter-spacing:-.02em;font-weight:
 }
 
 /* Amazon-style Itemized Table */
+.amz-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 12px;
+}
+
 .amz-table {
   width: 100%;
   border-collapse: collapse;
@@ -2949,6 +2976,96 @@ textarea{resize:vertical}h1{font-size:1.65rem;letter-spacing:-.02em;font-weight:
   color: #777777;
   border-top: 1px solid #e5e7eb;
   padding-top: 8px;
+}
+
+/* Mobile Responsiveness for Official Invoice Modal */
+@media (max-width: 640px) {
+  .receipt-modal-backdrop {
+    padding: 8px 6px !important;
+    align-items: flex-start !important;
+  }
+  .amazon-modal-dialog {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+  .amazon-print-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding: 8px 10px !important;
+  }
+  .amazon-bar-left {
+    justify-content: space-between !important;
+    width: 100% !important;
+  }
+  .amazon-bar-right {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+  .amazon-bar-right > * {
+    flex: 1 1 auto !important;
+    justify-content: center !important;
+    font-size: 0.75rem !important;
+    padding: 6px 8px !important;
+  }
+  .amazon-btn-close {
+    flex: 0 0 32px !important;
+  }
+  .amazon-invoice-sheet {
+    padding: 12px 10px !important;
+    font-size: 11px !important;
+    border-radius: 4px !important;
+  }
+  .amz-header-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  .amz-doc-meta {
+    text-align: left !important;
+    width: 100% !important;
+  }
+  .amz-table {
+    min-width: 580px !important;
+  }
+  .amz-table th, .amz-table td {
+    padding: 5px 6px !important;
+  }
+  .amz-words-row {
+    font-size: 0.72rem !important;
+    word-break: break-word !important;
+  }
+  .amz-payment-strip {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 8px 10px !important;
+  }
+  .amz-qr-barcode-block {
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .amz-barcode-card, .amz-qr-card {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .amz-declaration-row {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  .amz-dec-right {
+    align-items: flex-start !important;
+    text-align: left !important;
+    width: 100% !important;
+  }
+  .amz-sign-seal {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
 }
 
 /* ============================================================

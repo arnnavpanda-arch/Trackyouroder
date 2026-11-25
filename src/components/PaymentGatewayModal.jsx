@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 // Pure PhonePe-style instrumental notification chime (No spoken voice or words)
 function playSyntheticPhonePeChime() {
@@ -133,7 +134,7 @@ export default function PaymentGatewayModal({
     });
   };
 
-  return (
+  const modalContent = (
     <div className="gateway-backdrop" onClick={(e) => { if (screen === 'entry') onClose(); }}>
       <div className="gateway-container" onClick={(e) => e.stopPropagation()}>
         {screen === 'entry' && (
@@ -414,4 +415,6 @@ export default function PaymentGatewayModal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 }
