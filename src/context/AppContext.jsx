@@ -22,9 +22,17 @@ const defaultContextValue = {
 const Ctx = createContext(defaultContextValue);
 export const useApp = () => useContext(Ctx) || defaultContextValue;
 
+const getToken = () => {
+  try {
+    return localStorage.getItem(TK) || sessionStorage.getItem(TK);
+  } catch {
+    return null;
+  }
+};
+
 export function AppProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [booting, setBooting] = useState(!!sessionStorage.getItem(TK));
+  const [booting, setBooting] = useState(!!getToken());
   const [toasts, setToasts] = useState([]);
   const [notes, setNotes] = useState([]);
   const [settings, setSettings] = useState(() => {
@@ -77,11 +85,20 @@ export function AppProvider({ children }) {
   const dismiss = (id) => setToasts((t) => t.filter((x) => x.id !== id));
 
   useEffect(() => {
-    if (!sessionStorage.getItem(TK)) return;
-    api.me().then(setUser).catch(() => sessionStorage.removeItem(TK)).finally(() => setBooting(false));
+    const token = getToken();
+    if (!token) return;
+    api.me()
+      .then(setUser)
+      .catch(() => {
+        try {
+          localStorage.removeItem(TK);
+          sessionStorage.removeItem(TK);
+        } catch {}
+      })
+      .finally(() => setBooting(false));
   }, []);
 
-  const socket = useMemo(() => (user ? getSocket(sessionStorage.getItem(TK)) : null), [user]);
+  const socket = useMemo(() => (user ? getSocket(getToken()) : null), [user]);
 
   useEffect(() => {
     if (!socket || !user) return;
@@ -109,10 +126,25 @@ export function AppProvider({ children }) {
     };
   }, [socket, user, toast, loadSettings]);
 
-  const authed = ({ token, user: u }) => { sessionStorage.setItem(TK, token); setUser(u); return u; };
+  const authed = ({ token, user: u }) => {
+    try {
+      localStorage.setItem(TK, token);
+      sessionStorage.setItem(TK, token);
+    } catch {}
+    setUser(u);
+    return u;
+  };
   const login = async (email, password) => authed(await api.login(email, password));
   const register = async (body) => authed(await api.register(body));
-  const logout = () => { sessionStorage.removeItem(TK); closeSocket(); setUser(null); setNotes([]); };
+  const logout = () => {
+    try {
+      localStorage.removeItem(TK);
+      sessionStorage.removeItem(TK);
+    } catch {}
+    closeSocket();
+    setUser(null);
+    setNotes([]);
+  };
   const markRead = () => setNotes((p) => p.map((n) => ({ ...n, read: true })));
 
   return (

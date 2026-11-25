@@ -76,7 +76,15 @@ router.get('/', protect, async (req, res) => {
 // @desc    List orders for current customer
 router.get('/my', protect, async (req, res) => {
   try {
-    const orders = await Order.find({ userId: req.user._id.toString() }).sort({ createdAt: -1 });
+    const userIdStr = req.user._id.toString();
+    const query = {
+      $or: [
+        { userId: userIdStr },
+        { user: req.user._id },
+        ...(req.user.email ? [{ userEmail: req.user.email }] : [])
+      ]
+    };
+    const orders = await Order.find(query).sort({ createdAt: -1 });
     return res.json(orders.map((o) => o.toJSON()));
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -87,7 +95,14 @@ router.get('/my', protect, async (req, res) => {
 // @desc    List orders assigned to current agent
 router.get('/assigned', protect, async (req, res) => {
   try {
-    const orders = await Order.find({ agentId: req.user._id.toString() }).sort({ createdAt: -1 });
+    const agentIdStr = req.user._id.toString();
+    const query = {
+      $or: [
+        { agentId: agentIdStr },
+        { agent: req.user._id }
+      ]
+    };
+    const orders = await Order.find(query).sort({ createdAt: -1 });
     return res.json(orders.map((o) => o.toJSON()));
   } catch (err) {
     return res.status(500).json({ message: err.message });

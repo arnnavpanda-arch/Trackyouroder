@@ -7,10 +7,9 @@ export const connectDB = async () => {
     return mongoose.connection;
   }
 
-  const uri = process.env.MONGODB_URI;
-  if (!uri) {
-    throw new Error('MONGODB_URI is not defined. Please add MONGODB_URI in your Vercel Project Settings > Environment Variables.');
-  }
+  const DEFAULT_URI = 'mongodb+srv://bookpujaconnect_db_user:M3YQ5Vqw19a2LBVH@cluster0.b52rwhb.mongodb.net/pujaconnect?retryWrites=true&w=majority&appName=Cluster0';
+  const uri = process.env.MONGODB_URI || DEFAULT_URI;
+
 
   if (!cachedPromise) {
     cachedPromise = mongoose.connect(uri, {

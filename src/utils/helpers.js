@@ -1,6 +1,6 @@
 export const TK = 'dt_token';
 import { getDefaultServiceableRegions } from './indiaGeoData';
-export const MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
+export const MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 export const STATUSES = ['Placed', 'Picked-up', 'In-Transit', 'Delivered'];
 export const NEXT = { Placed: 'Picked-up', 'Picked-up': 'In-Transit', 'In-Transit': 'Delivered' };
 export const SLA_H = 8;

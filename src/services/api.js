@@ -11,12 +11,13 @@ const getApiBaseUrl = () => {
 
 export const http = axios.create({ baseURL: getApiBaseUrl(), timeout: 60000 });
 http.interceptors.request.use((c) => {
-  const t = sessionStorage.getItem(TK);
+  const t = localStorage.getItem(TK) || sessionStorage.getItem(TK);
   if (t) c.headers.Authorization = `Bearer ${t}`;
   return c;
 });
 http.interceptors.response.use((r) => r, (e) => {
   if (e.response?.status === 401) {
+    localStorage.removeItem(TK);
     sessionStorage.removeItem(TK);
     const p = window.location.pathname || '';
     const isPublic = p === '/login' || p === '/register' || p === '/' || p.includes('/pay/demo') || p.startsWith('/track');
